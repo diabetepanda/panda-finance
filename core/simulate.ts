@@ -7,6 +7,10 @@
 import { realRate } from "./rates";
 import { pvAnnuity } from "./annuity";
 import type { CategoryId } from "../config/categories";
+import {
+  plannedYearsAt, laborInsuranceMonthly, laborInsuranceRealAnnual,
+  laborPensionAccumulate, laborPensionMonthlyAnnual, type SocialInput,
+} from "./social";
 
 export interface ExpenseItem {
   name: string;
@@ -35,6 +39,9 @@ export interface SimInput {
   // Phase 2 退休支出依類別拆分：提供時退休支出逐年依類別實質成長率變動，
   // 退休所需資金改為逐年折現加總（第 3.6 節）；未提供 = Phase 1 固定缺口。
   retireSpendCategories?: { category: CategoryId; monthly: number }[] | null;
+  // Phase 3 勞保勞退（第 6 節）：null/未提供 = 不納入，結果與 Phase 1/2 一致。
+  // 年資、減給、勞退累積都在 simulate 內依候選退休年齡 R 重算（第 3.7 節要求）。
+  social?: SocialInput | null;
 }
 
 export interface SimRow {
@@ -46,10 +53,14 @@ export interface SimRow {
   flow: number;
   gain: number;
   assets: number;
+  li: number; // 勞保年金收入（實質，元/年；Phase 3）
+  lp: number; // 勞退月領收入（實質，元/年；Phase 3）
+  gap: number; // 年支出缺口（退休期；工作期為 0）
 }
 
 export interface SimResult {
   rows: SimRow[];
+  socialDetail: { liMonthlyToday: number; liYears: number; lpBalance: number; lpMonthlyAnnual: number } | null;
   retireAssets: number;
   required: number;
   achieve: number | null;
@@ -80,7 +91,7 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
   const rho = realRate(inp.retPost / 100, inf);
   const g = realRate(inp.salaryGrowth / 100, inf);
   const workYears = R - A, retYears = L - R;
-  const rows: SimRow[] = [{ t: 0, age: A, phase: "now", income: 0, expense: 0, flow: 0, gain: 0, assets: inp.initAssets }];
+  const rows: SimRow[] = [{ t: 0, age: A, phase: "now", income: 0, expense: 0, flow: 0, gain: 0, assets: inp.initAssets, li: 0, lp: 0, gap: 0 }];
   let assets = inp.initAssets;
   let workGap = 0, workGapNom = 0, lifetimeReal = 0, lifetimeNom = 0;
 
@@ -107,37 +118,59 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
       workGapNom += -raw * Math.pow(1 + inf, t);
       endA = 0; // 資產下限 0，不讓負資產繼續計息（第 3.4 節）
     }
-    rows.push({ t, age: A + t, phase: "work", income, expense, flow: saving, gain: endA - assets - saving, assets: endA });
+    rows.push({ t, age: A + t, phase: "work", income, expense, flow: saving, gain: endA - assets - saving, assets: endA, li: 0, lp: 0, gap: 0 });
     lifetimeReal += income;
     lifetimeNom += income * Math.pow(1 + inf, t);
     assets = endA;
   }
+  // ---- Phase 3：勞保勞退（依本次試算的退休年齡 R 重算） ----
+  const social = inp.social ?? null;
+  let liMonthlyToday = 0, liYears = 0, lpBalance = 0, lpMonthlyAnnual = 0;
+  if (social) {
+    liYears = plannedYearsAt(social.laborInsurance, A, R);
+    liMonthlyToday = laborInsuranceMonthly(social.laborInsurance, liYears);
+    lpBalance = laborPensionAccumulate(social.laborPension, A, R, inp.salaryGrowth, inp.inflation);
+    if (social.laborPension.mode === "lump") {
+      assets += lpBalance; // 一次領：併入退休時資產（第 6.3 節）
+    } else {
+      lpMonthlyAnnual = laborPensionMonthlyAnnual(lpBalance, social.laborPension.fundReturnPct, inp.inflation, retYears);
+    }
+  }
+
   const retireAssets = assets;
 
   const annualRetExp = inp.retireSpend * 12;
   const annualOther = inp.otherRetireIncome * 12;
-  const varying = inp.retireSpendCategories != null;
+  const varying = inp.retireSpendCategories != null || social !== null;
   // 退休第 k 年（總經過年數 t2）的實質退休支出與缺口：
   // 未拆分類別時固定（Phase 1 行為）；拆分時逐年依類別實質成長率變動。
-  const retireYear = (k: number): { expense: number; shortfall: number } => {
-    if (!varying) {
-      return { expense: annualRetExp, shortfall: Math.max(0, annualRetExp - annualOther) };
-    }
+  const retireYear = (k: number): { expense: number; shortfall: number; li: number; lp: number; income: number } => {
     const t2 = workYears + k;
-    let exp = 0;
-    for (const part of inp.retireSpendCategories!) {
-      const catPct = inp.categoryInflation?.[part.category] ?? inp.inflation;
-      const catReal = realRate(catPct / 100, inf);
-      exp += part.monthly * 12 * Math.pow(1 + catReal, t2 - 1);
+    let exp = annualRetExp;
+    if (inp.retireSpendCategories != null) {
+      exp = 0;
+      for (const part of inp.retireSpendCategories) {
+        const catPct = inp.categoryInflation?.[part.category] ?? inp.inflation;
+        const catReal = realRate(catPct / 100, inf);
+        exp += part.monthly * 12 * Math.pow(1 + catReal, t2 - 1);
+      }
     }
-    return { expense: exp, shortfall: Math.max(0, exp - annualOther) }; // 超額不回投（第 3.5 節）
+    // 勞保年金：請領年齡未到（空窗期）為 0，缺口全由資產支應（第 6.2、6.4 節）
+    let li = 0;
+    if (social && R + k >= social.laborInsurance.claimAge) {
+      li = laborInsuranceRealAnnual(liMonthlyToday, social.laborInsurance.indexed, inf, social.laborInsurance.claimAge - A, t2);
+    }
+    const lp = social ? lpMonthlyAnnual : 0;
+    const income = li + lp + annualOther;
+    // 支出缺口 = max(0, 退休支出 − 勞保 − 勞退月領 − 其他收入)；超額不回投（第 6.4、3.5 節）
+    return { expense: exp, shortfall: Math.max(0, exp - income), li, lp, income };
   };
   const shortfall = retireYear(1).shortfall; // Phase 1 固定缺口；拆分時為退休第一年缺口
   let uncovered = 0, uncoveredNom = 0, exhaustAge: number | null = null;
 
   for (let k = 1; k <= retYears; k++) {
     const t2 = workYears + k, age = R + k;
-    const { expense: retExpK, shortfall: shortfallK } = retireYear(k);
+    const { expense: retExpK, shortfall: shortfallK, li: liK, lp: lpK, income: incK } = retireYear(k);
     const raw2 = assets * (1 + rho) - shortfallK;
     let endB = raw2;
     if (raw2 < -eps) {
@@ -146,7 +179,7 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
       if (exhaustAge === null) exhaustAge = age;
       endB = 0;
     }
-    rows.push({ t: t2, age, phase: "retire", income: annualOther, expense: retExpK, flow: -shortfallK, gain: endB - assets + shortfallK, assets: endB });
+    rows.push({ t: t2, age, phase: "retire", income: incK, expense: retExpK, flow: -shortfallK, gain: endB - assets + shortfallK, assets: endB, li: liK, lp: lpK, gap: shortfallK });
     assets = endB;
   }
 
@@ -164,6 +197,7 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
 
   return {
     rows, retireAssets, required,
+    socialDetail: social ? { liMonthlyToday, liYears, lpBalance, lpMonthlyAnnual } : null,
     achieve: required > 0 ? retireAssets / required : null,
     exhaustAge, finalAssets: assets,
     workGap, workGapNom, uncovered, uncoveredNom,

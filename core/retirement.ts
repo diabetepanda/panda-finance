@@ -4,6 +4,7 @@
 import { simulate, type SimInput } from "./simulate";
 import { pvAnnuity } from "./annuity";
 import { paramValue } from "../config/defaults";
+import { CATEGORY_IDS, type CategoryId } from "../config/categories";
 
 /** 退休所需資金（第 3.6 節）：每年缺口固定時以年金現值計算，逐年缺口不同時應逐年折現（Phase 1 缺口固定） */
 export function requiredFunds(annualShortfall: number, realRetPostRate: number, retYears: number): number {
@@ -36,4 +37,13 @@ export function earliestRetirement(inp: SimInput): EarliestResult {
 /** 退休後每月支出預設 = 目前每月支出合計 × 比例%（規格第 7 節連動；原 ui 換算移到 core） */
 export function defaultRetireSpend(totalMonthlyExpense: number, ratioPct: number): number {
   return Math.round((totalMonthlyExpense * ratioPct) / 100);
+}
+
+/** 退休支出依類別拆分的預設值：各類別目前支出 × 比例%（原 ui 換算移到 core，Phase 3 修正） */
+export function defaultRetireSpendByCategory(
+  totalsByCat: Record<CategoryId, number>, ratioPct: number
+): Record<CategoryId, number> {
+  const out = {} as Record<CategoryId, number>;
+  for (const id of CATEGORY_IDS) out[id] = Math.round(totalsByCat[id] * (ratioPct / 100));
+  return out;
 }
