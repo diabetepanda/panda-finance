@@ -9,7 +9,7 @@ import { validateInput } from "../core/validate";
 import { computePhase1, computeScenarios, monthlyTotals, salaryRealGrowth, totalsByCategory, defaultScenarioInflation, resolveScenarioInflation, type ScenariosOutcome, type ScenarioOutcome } from "../core/compute";
 import type { SocialInput } from "../core/social";
 import { socialParamValue, bracketFor, LI_SALARY_BRACKETS, LR_WAGE_BRACKETS } from "../config/social";
-import { solveMonthlySaving, solveLumpSum, solveEarliestWithSaving } from "../core/goals";
+import { goalSavingAnswers, goalSpendAnswers, goalEarliestAnswers } from "../core/goals";
 import { assetComparison, purchasingPowerSeries, socialVariants } from "../core/compare";
 import { realToNominal, nominalToReal } from "../core/rates";
 import { paramValue, EXAMPLE_EXPENSES } from "../config/defaults";
@@ -48,7 +48,7 @@ interface FormState {
   liClaimAge: string; liDiscount: string; liIndexed: boolean;
   lrWage: string; lrWageManual: boolean;
   lrEmployerRate: string; lrEmployeeRate: string; lrFundReturn: string;
-  lrBalance: string; lrMode: "lump" | "monthly";
+  lrBalance: string; lrMode: "lump" | "monthly"; lrClaimAge: string;
 }
 
 const num = (s: string): number => (s.trim() === "" ? 0 : Number(s));
@@ -88,7 +88,7 @@ function defaultForm(): FormState {
     lrWage: "", lrWageManual: false,
     lrEmployerRate: String(socialParamValue("lrEmployerRate")), lrEmployeeRate: "0",
     lrFundReturn: String(socialParamValue("lrFundReturn")),
-    lrBalance: "0", lrMode: "lump",
+    lrBalance: "0", lrMode: "lump", lrClaimAge: String(socialParamValue("lrLegalClaimAge")),
   };
 }
 
@@ -133,6 +133,7 @@ function toInput(f: FormState): SimInput {
             fundReturnPct: num(f.lrFundReturn),
             currentBalance: num(f.lrBalance),
             mode: f.lrMode,
+            claimAge: num(f.lrClaimAge),
           },
         } as SocialInput
       : null,
@@ -148,7 +149,7 @@ interface Computed {
   savingsRate: number | null;
   extraSolution: ExtraSavingSolution | null;
   scenarios: ScenariosOutcome | null; // Phase 2：標的啟用時的三情境結果
-  goalScen: ScenariosOutcome; // Phase 3：目標反推用（不論標的開關都以第 5 區設定計算）
+  goalScen: ScenariosOutcome; // Phase 3：目標反推/比較圖的三情境管線（標的啟用時使用）
 }
 
 function compute(inp: SimInput, f: FormState): Computed {
@@ -622,6 +623,7 @@ export default function App() {
                     <div className="grid3">
                       <div><label htmlFor="lrFund">勞退基金收益率（名目，%／年）</label><input id="lrFund" type="number" inputMode="decimal" step="any" value={form.lrFundReturn} onChange={(e) => set({ lrFundReturn: e.target.value })} /></div>
                       <div><label htmlFor="lrBal">目前個人帳戶累積（元）</label><input id="lrBal" type="number" inputMode="decimal" step="any" value={form.lrBalance} onChange={(e) => set({ lrBalance: e.target.value })} /></div>
+                      <div><label htmlFor="lrClaim">勞退法定請領年齡（歲，假設參數）</label><input id="lrClaim" type="number" inputMode="numeric" step="1" value={form.lrClaimAge} onChange={(e) => set({ lrClaimAge: e.target.value })} /></div>
                       <div>
                         <label>請領方式</label>
                         <div className="seg" role="group" aria-label="勞退請領方式">
@@ -630,8 +632,11 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+                    {inp.social && num(form.ageRetire) < num(form.lrClaimAge) && (
+                      <p className="note">勞退個人帳戶通常需到法定年齡才能請領，退休到請領之間的支出會由你的資產支應。</p>
+                    )}
                     {inp.social && computed?.res.socialDetail && (
-                      <p className="note">試算：退休時勞退帳戶約 {fmtPlain(Math.round(computed.res.socialDetail.lpBalance))} 元（今日幣值）{form.lrMode === "monthly" ? `，月領約 ${fmtPlain(Math.round(computed.res.socialDetail.lpMonthlyAnnual / 12))} 元／月（以基金實質收益率年金化、領到預期壽命的簡化）` : "，一次領併入退休時資產"}。勞退提領課稅不納入計算；健保費等請自行反映在退休支出中。</p>
+                      <p className="note">試算：退休時勞退帳戶約 {fmtPlain(Math.round(computed.res.socialDetail.lpBalance))} 元（今日幣值），{computed.res.socialDetail.lpStartAge} 歲起領{form.lrMode === "monthly" ? `，月領約 ${fmtPlain(Math.round(computed.res.socialDetail.lpMonthlyAnnual / 12))} 元／月（以基金實質收益率年金化、領到預期壽命的簡化）` : computed.res.socialDetail.lpStartAge > num(form.ageRetire) ? `，一次領於 ${computed.res.socialDetail.lpStartAge} 歲併入資產（空窗期續以基金收益率累積）` : "，一次領併入退休時資產"}。勞退提領課稅不納入計算；健保費等請自行反映在退休支出中。</p>
                     )}
                   </>
                 )}
@@ -1044,7 +1049,8 @@ function GoalsCard({ c, form }: { c: Computed; form: FormState }) {
   const [targetSpend, setTargetSpend] = useState(String(c.inp.retireSpend));
   const [savingZ, setSavingZ] = useState(String(Math.round(c.monthlyBalance)));
   const scen = c.goalScen;
-  const byId = Object.fromEntries(scen.scenarios.map((x) => [x.id, x])) as Record<ScenarioId, ScenarioOutcome>;
+  const single = !form.assetsEnabled;
+  const rowLabel = (key: string) => (key === "single" ? "目前假設（與主畫面相同）" : SCENARIO_LABELS[key as ScenarioId]);
 
   return (
     <div className="card" style={{ marginTop: 16 }}>
@@ -1055,8 +1061,12 @@ function GoalsCard({ c, form }: { c: Computed; form: FormState }) {
           <button type="button" aria-pressed={mode === 2} onClick={() => setMode(2)}>模式二：退休想領多少</button>
           <button type="button" aria-pressed={mode === 3} onClick={() => setMode(3)}>模式三：每月存 Z 元幾歲退休</button>
         </div>
-        <p className="note">以下答案都是「在目前所有假設下」的試算，依第 5 區的標的與情境設定分三種情境計算（未啟用標的選擇時，使用第 5 區目前保留的配置與情境設定）。反推與主畫面共用同一個模擬引擎。</p>
-        {scen.paused ? (
+        {single ? (
+          <p className="note">以下答案使用與主畫面完全相同的假設（你輸入的退休前、退休後報酬率與通膨）。開啟『標的與配置』後，可看到保守、中性、樂觀三種情境的反推結果。反推與主畫面共用同一個模擬引擎。</p>
+        ) : (
+          <p className="note">以下答案都是「在目前所有假設下」的試算，依第 5 區的標的與情境設定分三種情境計算。反推與主畫面共用同一個模擬引擎。</p>
+        )}
+        {!single && scen.paused ? (
           <p className="range-line">請先讓配置總和為 100%（目前 {fmtPlain(Math.round(scen.allocationTotalPct * 10) / 10)}%），反推暫停計算。</p>
         ) : mode === 1 ? (
           <>
@@ -1066,10 +1076,9 @@ function GoalsCard({ c, form }: { c: Computed; form: FormState }) {
             </div>
             <table className="scen-table"><thead><tr><th>情境</th><th>每月至少要存</th><th>佔月收入</th><th>與目前結餘差距</th></tr></thead>
               <tbody>
-                {SCENARIO_IDS.map((id) => {
-                  const sol = solveMonthlySaving(byId[id].inp, num(targetAge));
+                {goalSavingAnswers(form.assetsEnabled, c.inp, scen, num(targetAge)).map(({ key, sol }) => {
                   return (
-                    <tr key={id}><th>{SCENARIO_LABELS[id]}</th>
+                    <tr key={key}><th>{rowLabel(key)}</th>
                       <td>{sol.found ? `${fmtPlain(sol.monthlySaving)} 元` : sol.reason}</td>
                       <td>{sol.found && sol.pctOfIncome !== null ? fmtPct(sol.pctOfIncome) : "—"}</td>
                       <td>{sol.found ? (sol.alreadyAchieved ? `目前已達成，餘裕 ${fmtPlain(Math.round(sol.surplus))} 元` : `還要多存 ${fmtPlain(Math.round(sol.gapVsCurrent))} 元`) : "—"}</td>
@@ -1086,12 +1095,9 @@ function GoalsCard({ c, form }: { c: Computed; form: FormState }) {
             </div>
             <table className="scen-table"><thead><tr><th>情境</th><th>(a) 每月需要儲蓄</th><th>(b) 現在一次投入</th></tr></thead>
               <tbody>
-                {SCENARIO_IDS.map((id) => {
-                  const inpY: SimInput = { ...byId[id].inp, retireSpend: num(targetSpend), retireSpendCategories: null };
-                  const a = solveMonthlySaving(inpY, inpY.ageRetire);
-                  const b = solveLumpSum(inpY, inpY.ageRetire);
+                {goalSpendAnswers(form.assetsEnabled, c.inp, scen, num(targetSpend)).map(({ key, saving: a, lump: b }) => {
                   return (
-                    <tr key={id}><th>{SCENARIO_LABELS[id]}</th>
+                    <tr key={key}><th>{rowLabel(key)}</th>
                       <td>{a.found ? `${fmtPlain(a.monthlySaving)} 元${a.alreadyAchieved ? "（目前已達成）" : ""}` : a.reason}</td>
                       <td>{b.found ? `${fmtPlain(b.lumpSum)} 元` : b.reason}</td>
                     </tr>
@@ -1108,10 +1114,9 @@ function GoalsCard({ c, form }: { c: Computed; form: FormState }) {
             </div>
             <table className="scen-table"><thead><tr><th>情境</th><th>最早可退休年齡</th></tr></thead>
               <tbody>
-                {SCENARIO_IDS.map((id) => {
-                  const e = solveEarliestWithSaving(byId[id].inp, num(savingZ));
+                {goalEarliestAnswers(form.assetsEnabled, c.inp, scen, num(savingZ)).map(({ key, earliest: e }) => {
                   return (
-                    <tr key={id}><th>{SCENARIO_LABELS[id]}</th>
+                    <tr key={key}><th>{rowLabel(key)}</th>
                       <td>{e.type === "age" ? `${e.age} 歲` : e.type === "already" ? (e.lastsToLife ? "已退休，可撐到預期壽命" : "已退休，資產不足以撐到預期壽命") : "在目前假設下無法達成"}</td>
                     </tr>
                   );
