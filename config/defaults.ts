@@ -71,6 +71,10 @@ PARAMS.push(
   p("concentrationWarnPct", "單一標的集中提醒門檻（台積電）", 30, "%", 0, 100, "台積電配置超過此比例時顯示集中風險提醒（第 5.4 節）。"),
   p("concentrationStrongPct", "單一個股強提醒門檻", 50, "%", 0, 100, "單一個股（台積電）配置超過此比例時顯示更明確的提醒，但不阻止使用（第 5.4 節）。")
 );
+PARAMS.push(
+  p("goalCompareYears", "標的比較年數", 20, "年", 1, 40, "圖表比較（第 6.6 節）：每月結餘投入單一標的比較的年數，預設 20 年、可調 1 至 40 年。"),
+  p("goalToleranceRatio", "反推容許誤差比例", 0.1, "%", 0, 10, "目標反推（第 6.5 節）：最後剩餘資產與 0 的差距需小於退休所需資金的此比例。")
+);
 // PARAM_MAP 需在 push 後重建
 for (const d of PARAMS) PARAM_MAP[d.id] = d;
 
