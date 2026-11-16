@@ -32,3 +32,8 @@ export function earliestRetirement(inp: SimInput): EarliestResult {
   }
   return { type: "none" };
 }
+
+/** 退休後每月支出預設 = 目前每月支出合計 × 比例%（規格第 7 節連動；原 ui 換算移到 core） */
+export function defaultRetireSpend(totalMonthlyExpense: number, ratioPct: number): number {
+  return Math.round((totalMonthlyExpense * ratioPct) / 100);
+}
