@@ -33,6 +33,9 @@ npm test        # Vitest，涵蓋規格案例 1、2、3、4、6、7、8、15 與
 ## 文件
 
 - [PARAMETERS.md](PARAMETERS.md)：所有暫定參數清單
+- [CALCULATION_SPEC.md](CALCULATION_SPEC.md)：計算規範與程式公式逐條對照（函式輸入/輸出/公式/範例數字）
+- [TEST_REPORT.md](TEST_REPORT.md)：測試報告（37 項全過）
+- [RISKS.md](RISKS.md)：已知風險與未做項目
 - [ASSUMPTIONS.md](ASSUMPTIONS.md)：簡化假設與已知限制
 - 計算規範與公式：見網站內「計算說明」區塊
 
