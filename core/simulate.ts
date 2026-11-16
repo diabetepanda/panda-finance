@@ -6,11 +6,13 @@
 
 import { realRate } from "./rates";
 import { pvAnnuity } from "./annuity";
+import type { CategoryId } from "../config/categories";
 
 export interface ExpenseItem {
   name: string;
   amount: number; // 元/月（今日幣值）
   endAge: number | null; // 到第幾歲結束；null = 不結束
+  category?: CategoryId; // Phase 2 分類通膨用；未指定視為 other
 }
 
 export interface SimInput {
@@ -27,6 +29,12 @@ export interface SimInput {
   retPre: number; // 名目 %
   retPost: number; // 名目 %
   extraMonthlySaving: number; // 額外每月儲蓄（反推用，預設 0）
+  // Phase 2 分類通膨（第 5.6 節）：類別通膨率（%）；null/未提供 = 單一通膨，
+  // 結果與 Phase 1 完全一致。某類別為 null = 採用總通膨率。
+  categoryInflation?: Partial<Record<CategoryId, number | null>> | null;
+  // Phase 2 退休支出依類別拆分：提供時退休支出逐年依類別實質成長率變動，
+  // 退休所需資金改為逐年折現加總（第 3.6 節）；未提供 = Phase 1 固定缺口。
+  retireSpendCategories?: { category: CategoryId; monthly: number }[] | null;
 }
 
 export interface SimRow {
@@ -80,7 +88,16 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
     const income = inp.monthlyIncome * 12 * Math.pow(1 + g, t - 1);
     let expense = 0;
     for (const e of inp.expenses) {
-      if (e.endAge === null || A + t <= e.endAge) expense += e.amount * 12;
+      if (e.endAge === null || A + t <= e.endAge) {
+        if (inp.categoryInflation == null) {
+          expense += e.amount * 12;
+        } else {
+          // 類別實質成長率 = (1 + 類別通膨) / (1 + 總通膨) − 1（第 5.6 節）
+          const catPct = inp.categoryInflation[e.category ?? "other"] ?? inp.inflation;
+          const catReal = realRate(catPct / 100, inf);
+          expense += e.amount * 12 * Math.pow(1 + catReal, t - 1);
+        }
+      }
     }
     const saving = income - expense + inp.extraMonthlySaving * 12;
     const raw = assets * (1 + r) + saving;
@@ -99,12 +116,29 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
 
   const annualRetExp = inp.retireSpend * 12;
   const annualOther = inp.otherRetireIncome * 12;
-  const shortfall = Math.max(0, annualRetExp - annualOther); // 超額不回投（第 3.5 節）
+  const varying = inp.retireSpendCategories != null;
+  // 退休第 k 年（總經過年數 t2）的實質退休支出與缺口：
+  // 未拆分類別時固定（Phase 1 行為）；拆分時逐年依類別實質成長率變動。
+  const retireYear = (k: number): { expense: number; shortfall: number } => {
+    if (!varying) {
+      return { expense: annualRetExp, shortfall: Math.max(0, annualRetExp - annualOther) };
+    }
+    const t2 = workYears + k;
+    let exp = 0;
+    for (const part of inp.retireSpendCategories!) {
+      const catPct = inp.categoryInflation?.[part.category] ?? inp.inflation;
+      const catReal = realRate(catPct / 100, inf);
+      exp += part.monthly * 12 * Math.pow(1 + catReal, t2 - 1);
+    }
+    return { expense: exp, shortfall: Math.max(0, exp - annualOther) }; // 超額不回投（第 3.5 節）
+  };
+  const shortfall = retireYear(1).shortfall; // Phase 1 固定缺口；拆分時為退休第一年缺口
   let uncovered = 0, uncoveredNom = 0, exhaustAge: number | null = null;
 
   for (let k = 1; k <= retYears; k++) {
     const t2 = workYears + k, age = R + k;
-    const raw2 = assets * (1 + rho) - shortfall;
+    const { expense: retExpK, shortfall: shortfallK } = retireYear(k);
+    const raw2 = assets * (1 + rho) - shortfallK;
     let endB = raw2;
     if (raw2 < -eps) {
       uncovered += -raw2;
@@ -112,11 +146,21 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
       if (exhaustAge === null) exhaustAge = age;
       endB = 0;
     }
-    rows.push({ t: t2, age, phase: "retire", income: annualOther, expense: annualRetExp, flow: -shortfall, gain: endB - assets + shortfall, assets: endB });
+    rows.push({ t: t2, age, phase: "retire", income: annualOther, expense: retExpK, flow: -shortfallK, gain: endB - assets + shortfallK, assets: endB });
     assets = endB;
   }
 
-  const required = retYears <= 0 || shortfall <= 0 ? 0 : pvAnnuity(shortfall, rho, retYears);
+  // 退休所需資金（第 3.6 節）：缺口固定用年金現值公式；缺口逐年不同時逐年折現加總
+  let required: number;
+  if (retYears <= 0) required = 0;
+  else if (!varying) required = shortfall <= 0 ? 0 : pvAnnuity(shortfall, rho, retYears);
+  else {
+    required = 0;
+    for (let k = 1; k <= retYears; k++) {
+      const { shortfall: sk } = retireYear(k);
+      required += 1 + rho <= 0 ? sk : sk * Math.pow(1 + rho, -k);
+    }
+  }
 
   return {
     rows, retireAssets, required,
