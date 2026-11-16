@@ -5,11 +5,11 @@
 ## 結果總覽
 
 ```
-✓ tests/phase3.test.ts (12 tests)
+✓ tests/phase3.test.ts (16 tests)
 ✓ tests/phase2.test.ts (12 tests)
 ✓ tests/phase1.test.ts (13 tests)
 Test Files  3 passed (3)
-Tests  37 passed (37)，失敗 0
+Tests  41 passed (41)，失敗 0
 ```
 
 ## 案例清單與狀態
@@ -37,6 +37,8 @@ Tests  37 passed (37)，失敗 0
 | 額外 | 功能 (a) solver（每月多存 1,520 元 → 75 歲） | 通過 |
 | 額外 | 勞退月領實質收益率 0 退化（總額 ÷ 年數） | 通過 |
 | 額外 | 中性情境通膨連動（linked 跟隨主畫面、unlinked 維持手動值） | 通過 |
+| 修正 | 標的未啟用時反推經 UI 入口（goalEarliestAnswers）採單一答案，模式三 Z = 結餘 → 49 歲 = 主畫面 | 通過 |
+| 修正 | 勞退空窗期 (a) 月領 50–59 歲收入 0、60 歲起領；(b) 一次領退休當下不併入、60 歲併入且金額 = 帳戶 ×(1+實質收益率)^10（含收益率 > 0 對照） | 通過 |
 
 ## 未以自動化測試覆蓋、改以真實瀏覽器人工驗證的項目
 

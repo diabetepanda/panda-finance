@@ -98,6 +98,7 @@
 | lrEmployeeMaxRate | 勞退員工自提率上限 | 6 | % | 自提可調上限 |
 | lrWageCap | 勞退提繳工資上限 | 150,000 | 元/月 | 上限不隨通膨調整（LR_WAGE_CAP_INFLATION_ADJUST = false） |
 | lrFundReturn | 勞退基金收益率（名目） | 2 | %/年 | 累積與月領年金化 |
+| lrLegalClaimAge 勞退法定請領年齡 | 60 | 歲 | 待查證 | 待填 | 實際開始領取年齡 = max(退休年齡, 此年齡) |
 | goalCompareYears | 標的比較年數 | 20 | 年 | 圖表比較預設 |
 | goalToleranceRatio | 反推容許誤差比例 | 0.1 | % | 反推收斂容許值（對所需資金） |
 

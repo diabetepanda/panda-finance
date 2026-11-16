@@ -58,6 +58,12 @@
 - 每年提繳（名目）= min(月提繳工資 × (1 + 名目薪資成長)^(t−1), 150,000) × 12 × (雇主% + 自提%)；實質提繳 = 名目 ÷ (1 + 通膨)^(t−1)；餘額 = 餘額 × (1 + 實質基金收益率) + 實質提繳（年底）。
 - 自提只進本帳戶，不從月收入重複扣除。
 
+### laborPensionStartAge(lp, retireAge) / laborPensionGrow(balance, fundReturnPct, inflationPct, waitYears)
+- 開始領取年齡 = max(退休年齡, 勞退法定請領年齡（參數 lrLegalClaimAge，預設 60）)。
+- 空窗期帳戶續累積：請領時帳戶 = 退休時帳戶 × (1 + 基金實質收益率)^waitYears（不再提繳）。
+- 一次領：無空窗期時退休當下併入資產；有空窗期時於請領那一年併入（金額為上式）。
+- 月領：年金化期間 = 預期壽命 − 開始領取年齡，年金化金額為請領時帳戶。
+
 ### laborPensionMonthlyAnnual(balance, fundReturnPct, inflationPct, years)
 - 年額 = balance ÷ pvAnnuity(1, 實質基金收益率, years)；實質收益率 0 時 = balance ÷ years。
 - 範例：1,200,000、名目 2%、通膨 2%（實質 0）、20 年 → 60,000/年。
@@ -102,3 +108,8 @@
 
 ### socialVariants(inp)
 - 目前設定 / 無勞保 / 無勞退 / 打折 0% / 30% / 50% 六個變體，各自跑 simulate + earliestRetirement。
+
+### goalRows / goalEarliestAnswers（UI 入口，core/goals.ts）
+- 標的未啟用：rows = [{ key: "single", inp: 主畫面 inp }]，反推與主畫面同一組假設。
+- 標的啟用：rows = 三情境各自的 inp。
+- 範例：未啟用、Z = 目前結餘 → 模式三答案 = 主畫面最早退休年齡 49 歲（測試驗證）。
