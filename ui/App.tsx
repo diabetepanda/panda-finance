@@ -3,16 +3,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SimInput, SimResult } from "../core/simulate";
 import type { EarliestResult } from "../core/retirement";
-import { defaultRetireSpend } from "../core/retirement";
+import { defaultRetireSpend, defaultRetireSpendByCategory } from "../core/retirement";
 import { findExtraSavingForEarliest, type ExtraSavingSolution } from "../core/solver";
 import { validateInput } from "../core/validate";
-import { computePhase1, computeScenarios, monthlyTotals, salaryRealGrowth, totalsByCategory, defaultScenarioInflation, type ScenariosOutcome, type ScenarioOutcome } from "../core/compute";
+import { computePhase1, computeScenarios, monthlyTotals, salaryRealGrowth, totalsByCategory, defaultScenarioInflation, resolveScenarioInflation, type ScenariosOutcome, type ScenarioOutcome } from "../core/compute";
+import type { SocialInput } from "../core/social";
+import { socialParamValue, bracketFor, LI_SALARY_BRACKETS, LR_WAGE_BRACKETS } from "../config/social";
+import { solveMonthlySaving, solveLumpSum, solveEarliestWithSaving } from "../core/goals";
+import { assetComparison, purchasingPowerSeries, socialVariants } from "../core/compare";
 import { realToNominal, nominalToReal } from "../core/rates";
 import { paramValue, EXAMPLE_EXPENSES } from "../config/defaults";
 import { ASSETS, ALLOCATION_PRESETS, SCENARIO_IDS, SCENARIO_LABELS, type ScenarioId } from "../config/assets";
 import { EXPENSE_CATEGORIES, CATEGORY_IDS, defaultCategoryFor, type CategoryId } from "../config/categories";
 import { fmtMoney, fmtNum, fmtPct, fmtPlain, fmtRatePct, unitWord, basisTag, type Basis, type Unit } from "./format";
-import Chart, { ScenarioChart } from "./chart";
+import Chart, { ScenarioChart, MultiLineChart, IncomeStackChart, PurchasingPowerChart, AssetRangeBars } from "./chart";
 
 interface ExpenseRow { name: string; amount: string; endAge: string; category: CategoryId; }
 interface FormState {
@@ -35,6 +39,16 @@ interface FormState {
   categoryInflation: Record<CategoryId, string>;
   retireSplitEnabled: boolean;
   retireSpendCats: Record<CategoryId, string>;
+  scenarioNeutralLinked: boolean;
+  // Phase 3 勞保勞退
+  socialEnabled: boolean;
+  liExistingYears: string;
+  liPlannedYears: string; liPlannedManual: boolean;
+  liAvgSalary: string; liSalaryManual: boolean;
+  liClaimAge: string; liDiscount: string; liIndexed: boolean;
+  lrWage: string; lrWageManual: boolean;
+  lrEmployerRate: string; lrEmployeeRate: string; lrFundReturn: string;
+  lrBalance: string; lrMode: "lump" | "monthly";
 }
 
 const num = (s: string): number => (s.trim() === "" ? 0 : Number(s));
@@ -65,6 +79,16 @@ function defaultForm(): FormState {
     categoryInflation: { housing: "", food: "", medical: "", other: "" },
     retireSplitEnabled: false,
     retireSpendCats: { housing: "0", food: "0", medical: "0", other: "0" },
+    scenarioNeutralLinked: true,
+    socialEnabled: false,
+    liExistingYears: "0",
+    liPlannedYears: "", liPlannedManual: false,
+    liAvgSalary: "", liSalaryManual: false,
+    liClaimAge: String(socialParamValue("liLegalClaimAge")), liDiscount: "0", liIndexed: true,
+    lrWage: "", lrWageManual: false,
+    lrEmployerRate: String(socialParamValue("lrEmployerRate")), lrEmployeeRate: "0",
+    lrFundReturn: String(socialParamValue("lrFundReturn")),
+    lrBalance: "0", lrMode: "lump",
   };
 }
 
@@ -92,6 +116,26 @@ function toInput(f: FormState): SimInput {
     retireSpendCategories: f.retireSplitEnabled
       ? CATEGORY_IDS.map((id) => ({ category: id, monthly: num(f.retireSpendCats[id]) }))
       : null,
+    social: f.socialEnabled
+      ? {
+          laborInsurance: {
+            existingYears: num(f.liExistingYears),
+            plannedYears: f.liPlannedManual ? num(f.liPlannedYears) : null,
+            avgInsuredSalary: f.liSalaryManual ? num(f.liAvgSalary) : bracketFor(num(f.monthlyIncome), LI_SALARY_BRACKETS, socialParamValue("liSalaryCap")),
+            claimAge: num(f.liClaimAge),
+            discountPct: num(f.liDiscount),
+            indexed: f.liIndexed,
+          },
+          laborPension: {
+            monthlyWage: f.lrWageManual ? num(f.lrWage) : bracketFor(num(f.monthlyIncome), LR_WAGE_BRACKETS, socialParamValue("lrWageCap")),
+            employerRatePct: num(f.lrEmployerRate),
+            employeeRatePct: num(f.lrEmployeeRate),
+            fundReturnPct: num(f.lrFundReturn),
+            currentBalance: num(f.lrBalance),
+            mode: f.lrMode,
+          },
+        } as SocialInput
+      : null,
   } as SimInput;
 }
 
@@ -104,29 +148,32 @@ interface Computed {
   savingsRate: number | null;
   extraSolution: ExtraSavingSolution | null;
   scenarios: ScenariosOutcome | null; // Phase 2：標的啟用時的三情境結果
+  goalScen: ScenariosOutcome; // Phase 3：目標反推用（不論標的開關都以第 5 區設定計算）
 }
 
 function compute(inp: SimInput, f: FormState): Computed {
   const out = computePhase1(inp);
   const totals = monthlyTotals(inp);
   const extraSolution = out.earliest.type === "none" ? findExtraSavingForEarliest(inp) : null;
-  let scenarios: ScenariosOutcome | null = null;
-  if (f.assetsEnabled) {
-    scenarios = computeScenarios(inp, {
-      allocation: Object.fromEntries(Object.entries(f.allocation).map(([k, v]) => [k, num(v)])),
-      retireAllocMode: f.retireAllocMode,
-      retireAllocation: Object.fromEntries(Object.entries(f.retireAllocation).map(([k, v]) => [k, num(v)])),
-      fxChangePct: num(f.fxChange),
-      returnOverrides: Object.fromEntries(Object.entries(f.returnOverrides).map(([k, rec]) => [k, Object.fromEntries(Object.entries(rec).map(([sid, v]) => [sid, num(v)])) as Record<ScenarioId, number>])),
-      scenarioInflation: Object.fromEntries(SCENARIO_IDS.map((id) => [id, num(f.scenarioInflation[id])])) as Record<ScenarioId, number>,
-      deductionPct: num(f.deduction),
-    });
-  }
+  const scenSettings = {
+    allocation: Object.fromEntries(Object.entries(f.allocation).map(([k, v]) => [k, num(v)])),
+    retireAllocMode: f.retireAllocMode,
+    retireAllocation: Object.fromEntries(Object.entries(f.retireAllocation).map(([k, v]) => [k, num(v)])),
+    fxChangePct: num(f.fxChange),
+    returnOverrides: Object.fromEntries(Object.entries(f.returnOverrides).map(([k, rec]) => [k, Object.fromEntries(Object.entries(rec).map(([sid, v]) => [sid, num(v)])) as Record<ScenarioId, number>])),
+    scenarioInflation: resolveScenarioInflation(
+      Object.fromEntries(SCENARIO_IDS.map((id) => [id, num(f.scenarioInflation[id])])) as Record<ScenarioId, number>,
+      f.scenarioNeutralLinked, inp.inflation
+    ),
+    deductionPct: num(f.deduction),
+  };
+  const scenOutcome = computeScenarios(inp, scenSettings);
+  const scenarios: ScenariosOutcome | null = f.assetsEnabled ? scenOutcome : null;
   return {
     inp, res: out.res, earliest: out.earliest,
     totalMonthlyExpense: totals.totalExpense, monthlyBalance: totals.balance,
     savingsRate: totals.totalIncome > 0 ? totals.savingsRate : null,
-    extraSolution, scenarios,
+    extraSolution, scenarios, goalScen: scenOutcome,
   };
 }
 
@@ -368,9 +415,8 @@ export default function App() {
                   <input type="checkbox" checked={form.retireSplitEnabled}
                     onChange={(e) => {
                       if (e.target.checked && !form.retireSplitEnabled) {
-                        const byCat = totalsByCategory(inp);
-                        const r = paramValue("retireSpendRatio") / 100;
-                        set({ retireSplitEnabled: true, retireSpendCats: Object.fromEntries(CATEGORY_IDS.map((id) => [id, String(Math.round(byCat[id] * r))])) as Record<CategoryId, string> });
+                        const byCat = defaultRetireSpendByCategory(totalsByCategory(inp), paramValue("retireSpendRatio"));
+                        set({ retireSplitEnabled: true, retireSpendCats: Object.fromEntries(CATEGORY_IDS.map((id) => [id, String(byCat[id])])) as Record<CategoryId, string> });
                       } else set({ retireSplitEnabled: e.target.checked });
                     }} />
                   退休支出依類別拆分（各類別分別成長）
@@ -411,12 +457,20 @@ export default function App() {
                         <div className="grid3">
                           {SCENARIO_IDS.map((id) => (
                             <div key={id}>
-                              <label htmlFor={`scinf-${id}`}>{SCENARIO_LABELS[id]}</label>
-                              <input id={`scinf-${id}`} type="number" inputMode="decimal" step="any" value={form.scenarioInflation[id]}
-                                onChange={(e) => set({ scenarioInflation: { ...form.scenarioInflation, [id]: e.target.value } })} />
+                              <label htmlFor={`scinf-${id}`}>{SCENARIO_LABELS[id]}{id === "neutral" && form.scenarioNeutralLinked ? "（與主畫面通膨連動）" : ""}</label>
+                              <input id={`scinf-${id}`} type="number" inputMode="decimal" step="any"
+                                value={id === "neutral" && form.scenarioNeutralLinked ? form.inflation : form.scenarioInflation[id]}
+                                onChange={(e) => id === "neutral"
+                                  ? set({ scenarioInflation: { ...form.scenarioInflation, neutral: e.target.value }, scenarioNeutralLinked: false })
+                                  : set({ scenarioInflation: { ...form.scenarioInflation, [id]: e.target.value } })} />
                             </div>
                           ))}
                         </div>
+                        {!form.scenarioNeutralLinked && (
+                          <p className="note">中性情境通膨已手動修改，與主畫面通膨脫鉤。
+                            <button type="button" className="ghost small" style={{ marginLeft: 8 }} onClick={() => set({ scenarioNeutralLinked: true })}>恢復與主畫面通膨連動</button>
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -499,6 +553,91 @@ export default function App() {
               </div>
             </details>
 
+            <details className="card" open>
+              <summary>6. 勞保與勞退（選用）</summary>
+              <div className="card-body">
+                <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                  <input type="checkbox" checked={form.socialEnabled} onChange={(e) => set({ socialEnabled: e.target.checked })} />
+                  納入勞保與勞退（關閉時不影響試算）
+                </label>
+                {form.socialEnabled && (
+                  <>
+                    <p className="note">以下都是目前採用的假設參數（待查證），不是官方規定；請以勞動部勞工保險局、勞動基金運用局最新公告為準。</p>
+                    <p className="note"><b>月收入請填扣掉勞退自提之後的實領金額</b>，自提部分會另外算進勞退帳戶，不會再從收入扣一次。</p>
+                    <h3 style={{ margin: "12px 0 6px" }}>勞保老年年金</h3>
+                    <div className="grid3">
+                      <div><label htmlFor="liYears">目前已有勞保年資（年）</label><input id="liYears" type="number" inputMode="decimal" step="any" value={form.liExistingYears} onChange={(e) => set({ liExistingYears: e.target.value })} /></div>
+                      <div>
+                        <label htmlFor="liPlanned">預計投保年資（年）</label>
+                        <input id="liPlanned" type="number" inputMode="decimal" step="any"
+                          value={form.liPlannedManual ? form.liPlannedYears : String(num(form.liExistingYears) + Math.max(0, num(form.ageRetire) - num(form.ageNow)))}
+                          onChange={(e) => set({ liPlannedYears: e.target.value, liPlannedManual: true })} />
+                        {form.liPlannedManual && <button type="button" className="ghost small" onClick={() => set({ liPlannedManual: false, liPlannedYears: "" })}>恢復自動（已有年資＋工作年數）</button>}
+                      </div>
+                      <div>
+                        <label htmlFor="liSalary">平均月投保薪資（元）</label>
+                        <input id="liSalary" type="number" inputMode="decimal" step="any"
+                          value={form.liSalaryManual ? form.liAvgSalary : String(bracketFor(num(form.monthlyIncome), LI_SALARY_BRACKETS, socialParamValue("liSalaryCap")))}
+                          onChange={(e) => set({ liAvgSalary: e.target.value, liSalaryManual: true })} />
+                        {form.liSalaryManual && <button type="button" className="ghost small" onClick={() => set({ liSalaryManual: false, liAvgSalary: "" })}>恢復依月薪級距</button>}
+                        <p className="note">上限 {fmtPlain(socialParamValue("liSalaryCap"))} 元（假設參數）。</p>
+                      </div>
+                    </div>
+                    <div className="grid3">
+                      <div><label htmlFor="liClaim">請領年齡（歲）</label><input id="liClaim" type="number" inputMode="numeric" step="1" value={form.liClaimAge} onChange={(e) => set({ liClaimAge: e.target.value })} /></div>
+                      <div>
+                        <label htmlFor="liDiscount">年金給付打折（%）<span className="unit-hint">模擬勞保財務風險</span></label>
+                        <input id="liDiscount" type="range" min="0" max="50" step="1" value={form.liDiscount} onChange={(e) => set({ liDiscount: e.target.value })} />
+                        <span>{form.liDiscount}%</span>
+                      </div>
+                      <div>
+                        <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 22 }}>
+                          <input type="checkbox" checked={form.liIndexed} onChange={(e) => set({ liIndexed: e.target.checked })} />
+                          年金會隨通膨調整
+                        </label>
+                      </div>
+                    </div>
+                    {(() => {
+                      const planned = form.liPlannedManual ? num(form.liPlannedYears) : num(form.liExistingYears) + Math.max(0, num(form.ageRetire) - num(form.ageNow));
+                      return planned < socialParamValue("liMinYears") ? (
+                        <p className="soft-hint show">年資可能不符合請領年金的條件（目前假設參數：需 {socialParamValue("liMinYears")} 年以上），請自行確認；下方仍顯示試算值，但不一定符合資格。</p>
+                      ) : null;
+                    })()}
+                    {inp.social && computed?.res.socialDetail && (
+                      <p className="note">試算：預計年資 {computed.res.socialDetail.liYears} 年，勞保月領（今日幣值，調整與打折後）約 {fmtPlain(Math.round(computed.res.socialDetail.liMonthlyToday))} 元。</p>
+                    )}
+                    <h3 style={{ margin: "14px 0 6px" }}>勞退新制</h3>
+                    <div className="grid3">
+                      <div>
+                        <label htmlFor="lrWage">月提繳工資（元）</label>
+                        <input id="lrWage" type="number" inputMode="decimal" step="any"
+                          value={form.lrWageManual ? form.lrWage : String(bracketFor(num(form.monthlyIncome), LR_WAGE_BRACKETS, socialParamValue("lrWageCap")))}
+                          onChange={(e) => set({ lrWage: e.target.value, lrWageManual: true })} />
+                        {form.lrWageManual && <button type="button" className="ghost small" onClick={() => set({ lrWageManual: false, lrWage: "" })}>恢復依月薪級距</button>}
+                        <p className="note">上限 {fmtPlain(socialParamValue("lrWageCap"))} 元（假設參數），上限不隨通膨調整。</p>
+                      </div>
+                      <div><label htmlFor="lrEmp">雇主提繳率（%）</label><input id="lrEmp" type="number" inputMode="decimal" step="any" value={form.lrEmployerRate} onChange={(e) => set({ lrEmployerRate: e.target.value })} /></div>
+                      <div><label htmlFor="lrSelf">員工自提率（%，0–{socialParamValue("lrEmployeeMaxRate")}）</label><input id="lrSelf" type="number" inputMode="decimal" step="any" value={form.lrEmployeeRate} onChange={(e) => set({ lrEmployeeRate: e.target.value })} /></div>
+                    </div>
+                    <div className="grid3">
+                      <div><label htmlFor="lrFund">勞退基金收益率（名目，%／年）</label><input id="lrFund" type="number" inputMode="decimal" step="any" value={form.lrFundReturn} onChange={(e) => set({ lrFundReturn: e.target.value })} /></div>
+                      <div><label htmlFor="lrBal">目前個人帳戶累積（元）</label><input id="lrBal" type="number" inputMode="decimal" step="any" value={form.lrBalance} onChange={(e) => set({ lrBalance: e.target.value })} /></div>
+                      <div>
+                        <label>請領方式</label>
+                        <div className="seg" role="group" aria-label="勞退請領方式">
+                          <button type="button" aria-pressed={form.lrMode === "lump"} onClick={() => set({ lrMode: "lump" })}>一次領</button>
+                          <button type="button" aria-pressed={form.lrMode === "monthly"} onClick={() => set({ lrMode: "monthly" })}>月領</button>
+                        </div>
+                      </div>
+                    </div>
+                    {inp.social && computed?.res.socialDetail && (
+                      <p className="note">試算：退休時勞退帳戶約 {fmtPlain(Math.round(computed.res.socialDetail.lpBalance))} 元（今日幣值）{form.lrMode === "monthly" ? `，月領約 ${fmtPlain(Math.round(computed.res.socialDetail.lpMonthlyAnnual / 12))} 元／月（以基金實質收益率年金化、領到預期壽命的簡化）` : "，一次領併入退休時資產"}。勞退提領課稅不納入計算；健保費等請自行反映在退休支出中。</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </details>
+
             <div className="card no-print">
               <div className="card-body" style={{ paddingTop: 16 }}>
                 <div className="actions">
@@ -529,6 +668,12 @@ export default function App() {
               )
             ) : computed ? <Results c={computed} basis={basis} unit={unit} setBasis={setBasis} setUnit={setUnit} onCsv={() => downloadCsv(computed)} /> : (
               <div className="card"><div className="card-body"><p className="note">請先修正左側輸入的提示，再查看試算結果。</p></div></div>
+            )}
+            {computed && !stale && (
+              <>
+                <GoalsCard c={computed} form={debounced} />
+                <CompareCard c={computed} form={debounced} unit={unit} />
+              </>
             )}
           </div>
         </div>
@@ -663,6 +808,16 @@ function Results({ c, basis, unit, setBasis, setUnit, onCsv }: {
         </div>
       </div>
 
+      {res.socialDetail && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-head"><h2>退休收入來源結構</h2></div>
+          <div className="card-body">
+            <IncomeStackChart res={res} unit={unit} />
+            <p className="note">每一根柱是該年退休支出（今日幣值）的來源組成；紅色部分是需要由投資資產提領支應的缺口。</p>
+          </div>
+        </div>
+      )}
+
       <details className="card" style={{ marginTop: 16 }}>
         <summary>逐年明細表</summary>
         <div className="card-body">
@@ -671,7 +826,7 @@ function Results({ c, basis, unit, setBasis, setUnit, onCsv }: {
           </div>
           <div className="table-scroll">
             <table className="detail-table">
-              <thead><tr><th>年齡</th><th>年收入</th><th>年支出</th><th>年儲蓄</th><th>投資收益</th><th>年底資產</th></tr></thead>
+              <thead><tr><th>年齡</th><th>年收入</th><th>年支出</th><th>年儲蓄</th><th>投資收益</th><th>年底資產</th>{inp.social && <><th>勞保年金</th><th>勞退月領</th><th>年支出缺口</th></>}</tr></thead>
               <tbody>
                 {res.rows.map((row) => {
                   const cv = (v: number) => fmtNum(basis === "nominal" ? realToNominal(v, inp.inflation / 100, row.t) : v, unit);
@@ -679,6 +834,7 @@ function Results({ c, basis, unit, setBasis, setUnit, onCsv }: {
                     <tr key={row.age} className={row.phase === "retire" ? "retire-row" : row.phase === "now" ? "now-row" : ""}>
                       <td>{row.age}</td><td>{cv(row.income)}</td><td>{cv(row.expense)}</td>
                       <td>{cv(row.flow)}</td><td>{cv(row.gain)}</td><td>{cv(row.assets)}</td>
+                      {inp.social && <><td>{row.phase === "retire" ? cv(row.li) : "—"}</td><td>{row.phase === "retire" ? cv(row.lp) : "—"}</td><td>{row.phase === "retire" ? cv(row.gap) : "—"}</td></>}
                     </tr>
                   );
                 })}
@@ -859,7 +1015,7 @@ function ScenarioResults({ c, scen, basis, unit, setBasis, setUnit }: {
           </div>
           <div className="table-scroll">
             <table className="detail-table">
-              <thead><tr><th>年齡</th><th>年收入</th><th>年支出</th><th>年儲蓄</th><th>投資收益</th><th>年底資產</th></tr></thead>
+              <thead><tr><th>年齡</th><th>年收入</th><th>年支出</th><th>年儲蓄</th><th>投資收益</th><th>年底資產</th>{detail.inp.social && <><th>勞保年金</th><th>勞退月領</th><th>年支出缺口</th></>}</tr></thead>
               <tbody>
                 {detail.res.rows.map((row) => {
                   const cv = (v: number) => fmtNum(basis === "nominal" ? realToNominal(v, detail.inflationPct / 100, row.t) : v, unit);
@@ -867,6 +1023,7 @@ function ScenarioResults({ c, scen, basis, unit, setBasis, setUnit }: {
                     <tr key={row.age} className={row.phase === "retire" ? "retire-row" : row.phase === "now" ? "now-row" : ""}>
                       <td>{row.age}</td><td>{cv(row.income)}</td><td>{cv(row.expense)}</td>
                       <td>{cv(row.flow)}</td><td>{cv(row.gain)}</td><td>{cv(row.assets)}</td>
+                      {detail.inp.social && <><td>{row.phase === "retire" ? cv(row.li) : "—"}</td><td>{row.phase === "retire" ? cv(row.lp) : "—"}</td><td>{row.phase === "retire" ? cv(row.gap) : "—"}</td></>}
                     </tr>
                   );
                 })}
@@ -878,5 +1035,173 @@ function ScenarioResults({ c, scen, basis, unit, setBasis, setUnit }: {
         </div>
       </details>
     </>
+  );
+}
+
+function GoalsCard({ c, form }: { c: Computed; form: FormState }) {
+  const [mode, setMode] = useState<1 | 2 | 3>(1);
+  const [targetAge, setTargetAge] = useState(String(c.inp.ageRetire));
+  const [targetSpend, setTargetSpend] = useState(String(c.inp.retireSpend));
+  const [savingZ, setSavingZ] = useState(String(Math.round(c.monthlyBalance)));
+  const scen = c.goalScen;
+  const byId = Object.fromEntries(scen.scenarios.map((x) => [x.id, x])) as Record<ScenarioId, ScenarioOutcome>;
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="card-head"><h2>目標反推</h2></div>
+      <div className="card-body">
+        <div className="seg no-print" role="group" aria-label="反推模式">
+          <button type="button" aria-pressed={mode === 1} onClick={() => setMode(1)}>模式一：幾歲退休要存多少</button>
+          <button type="button" aria-pressed={mode === 2} onClick={() => setMode(2)}>模式二：退休想領多少</button>
+          <button type="button" aria-pressed={mode === 3} onClick={() => setMode(3)}>模式三：每月存 Z 元幾歲退休</button>
+        </div>
+        <p className="note">以下答案都是「在目前所有假設下」的試算，依第 5 區的標的與情境設定分三種情境計算（未啟用標的選擇時，使用第 5 區目前保留的配置與情境設定）。反推與主畫面共用同一個模擬引擎。</p>
+        {scen.paused ? (
+          <p className="range-line">請先讓配置總和為 100%（目前 {fmtPlain(Math.round(scen.allocationTotalPct * 10) / 10)}%），反推暫停計算。</p>
+        ) : mode === 1 ? (
+          <>
+            <div style={{ maxWidth: 300 }}>
+              <label htmlFor="goalAge">想在幾歲退休（歲）</label>
+              <input id="goalAge" type="number" inputMode="numeric" step="1" value={targetAge} onChange={(e) => setTargetAge(e.target.value)} />
+            </div>
+            <table className="scen-table"><thead><tr><th>情境</th><th>每月至少要存</th><th>佔月收入</th><th>與目前結餘差距</th></tr></thead>
+              <tbody>
+                {SCENARIO_IDS.map((id) => {
+                  const sol = solveMonthlySaving(byId[id].inp, num(targetAge));
+                  return (
+                    <tr key={id}><th>{SCENARIO_LABELS[id]}</th>
+                      <td>{sol.found ? `${fmtPlain(sol.monthlySaving)} 元` : sol.reason}</td>
+                      <td>{sol.found && sol.pctOfIncome !== null ? fmtPct(sol.pctOfIncome) : "—"}</td>
+                      <td>{sol.found ? (sol.alreadyAchieved ? `目前已達成，餘裕 ${fmtPlain(Math.round(sol.surplus))} 元` : `還要多存 ${fmtPlain(Math.round(sol.gapVsCurrent))} 元`) : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody></table>
+          </>
+        ) : mode === 2 ? (
+          <>
+            <div style={{ maxWidth: 300 }}>
+              <label htmlFor="goalSpend">退休後每月想花（元，今日幣值）</label>
+              <input id="goalSpend" type="number" inputMode="decimal" step="any" value={targetSpend} onChange={(e) => setTargetSpend(e.target.value)} />
+            </div>
+            <table className="scen-table"><thead><tr><th>情境</th><th>(a) 每月需要儲蓄</th><th>(b) 現在一次投入</th></tr></thead>
+              <tbody>
+                {SCENARIO_IDS.map((id) => {
+                  const inpY: SimInput = { ...byId[id].inp, retireSpend: num(targetSpend), retireSpendCategories: null };
+                  const a = solveMonthlySaving(inpY, inpY.ageRetire);
+                  const b = solveLumpSum(inpY, inpY.ageRetire);
+                  return (
+                    <tr key={id}><th>{SCENARIO_LABELS[id]}</th>
+                      <td>{a.found ? `${fmtPlain(a.monthlySaving)} 元${a.alreadyAchieved ? "（目前已達成）" : ""}` : a.reason}</td>
+                      <td>{b.found ? `${fmtPlain(b.lumpSum)} 元` : b.reason}</td>
+                    </tr>
+                  );
+                })}
+              </tbody></table>
+            <p className="note">(b) 是在每月儲蓄為 0、既有資產不變的前提下，現在需要一次投入的金額。</p>
+          </>
+        ) : (
+          <>
+            <div style={{ maxWidth: 300 }}>
+              <label htmlFor="goalZ">每月可以存（元，今日幣值）</label>
+              <input id="goalZ" type="number" inputMode="decimal" step="any" value={savingZ} onChange={(e) => setSavingZ(e.target.value)} />
+            </div>
+            <table className="scen-table"><thead><tr><th>情境</th><th>最早可退休年齡</th></tr></thead>
+              <tbody>
+                {SCENARIO_IDS.map((id) => {
+                  const e = solveEarliestWithSaving(byId[id].inp, num(savingZ));
+                  return (
+                    <tr key={id}><th>{SCENARIO_LABELS[id]}</th>
+                      <td>{e.type === "age" ? `${e.age} 歲` : e.type === "already" ? (e.lastsToLife ? "已退休，可撐到預期壽命" : "已退休，資產不足以撐到預期壽命") : "在目前假設下無法達成"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody></table>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CompareCard({ c, form, unit }: { c: Computed; form: FormState; unit: Unit }) {
+  const [years, setYears] = useState(String(paramValue("goalCompareYears")));
+  const [singleAsset, setSingleAsset] = useState("voo");
+  const scen = c.goalScen;
+  const byId = Object.fromEntries(scen.scenarios.map((x) => [x.id, x])) as Record<ScenarioId, ScenarioOutcome>;
+  const neuInp = byId.neutral?.inp ?? c.inp;
+  const scenInf = Object.fromEntries(scen.scenarios.map((x) => [x.id, x.inflationPct])) as Record<ScenarioId, number>;
+  const overrides = Object.fromEntries(Object.entries(form.returnOverrides).map(([k, rec]) => [k, Object.fromEntries(Object.entries(rec).map(([sid, v]) => [sid, num(v)])) as Record<ScenarioId, number>]));
+  const nYears = Math.min(40, Math.max(1, num(years) || paramValue("goalCompareYears")));
+  const compareRows = assetComparison(c.monthlyBalance, c.inp.initAssets, nYears, scenInf, overrides, num(form.fxChange));
+  const allocSeries = (() => {
+    if (scen.paused) return [];
+    const mk = (alloc: Record<string, number>) => computeScenarios(c.inp, {
+      allocation: alloc, retireAllocMode: form.retireAllocMode,
+      retireAllocation: Object.fromEntries(Object.entries(form.retireAllocation).map(([k, v]) => [k, num(v)])),
+      fxChangePct: num(form.fxChange), returnOverrides: overrides, scenarioInflation: scenInf,
+      deductionPct: num(form.deduction),
+    }).scenarios.find((x) => x.id === "neutral");
+    const mine = byId.neutral;
+    const single = mk({ [singleAsset]: 100 });
+    const cash = mk({ cash: 100 });
+    const pts = (o?: ScenarioOutcome) => (o ? o.res.rows.map((r) => ({ age: r.age, v: r.assets })) : []);
+    return [
+      { label: "我的配置（中性）", points: pts(mine), color: "#2e7d4f" },
+      { label: `${ASSETS.find((a) => a.id === singleAsset)?.label ?? ""} 100%（中性）`, points: pts(single), color: "#3366aa", dash: "5 4" },
+      { label: "定存 / 現金（中性）", points: pts(cash), color: "#c9a227", dash: "2 3" },
+    ];
+  })();
+  const horizon = Math.max(1, c.inp.ageLife - c.inp.ageNow);
+  const ppSeries = purchasingPowerSeries(1000000, c.inp.inflation, horizon);
+  const ppAtRetire = nominalToReal(1000000, c.inp.inflation / 100, Math.max(0, c.inp.ageRetire - c.inp.ageNow));
+  const variants = c.inp.social ? socialVariants(c.inp) : [];
+
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="card-head"><h2>圖表比較</h2></div>
+      <div className="card-body">
+        <h3 style={{ margin: "6px 0" }}>各標的在假設報酬率下的資產比較</h3>
+        <div style={{ maxWidth: 260 }}>
+          <label htmlFor="cmpYears">比較年數 N（年，1–40）</label>
+          <input id="cmpYears" type="number" inputMode="numeric" step="1" value={years} onChange={(e) => setYears(e.target.value)} />
+        </div>
+        <p className="note">假設每月結餘 100% 投入單一標的，{nYears} 年後資產（實質口徑，今日幣值）。</p>
+        <AssetRangeBars rows={compareRows.map((r) => ({ label: r.label, cons: r.values.conservative, neu: r.values.neutral, opt: r.values.optimistic }))} unit={unit} />
+        <details>
+          <summary>標的比較資料表</summary>
+          <table className="scen-table"><thead><tr><th>標的</th><th>保守</th><th>中性</th><th>樂觀</th></tr></thead>
+            <tbody>{compareRows.map((r) => (
+              <tr key={r.assetId}><th>{r.label}</th><td>{fmtNum(r.values.conservative, unit)}</td><td>{fmtNum(r.values.neutral, unit)}</td><td>{fmtNum(r.values.optimistic, unit)}</td></tr>
+            ))}</tbody></table>
+        </details>
+
+        <h3 style={{ margin: "16px 0 6px" }}>配置的資產曲線比較（中性情境）</h3>
+        <div style={{ maxWidth: 260 }}>
+          <label htmlFor="cmpAsset">單一標的選擇</label>
+          <select id="cmpAsset" value={singleAsset} onChange={(e) => setSingleAsset(e.target.value)}>
+            {ASSETS.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+          </select>
+        </div>
+        {allocSeries.length ? <MultiLineChart series={allocSeries} unit={unit} /> : <p className="note">請先讓配置總和為 100%。</p>}
+
+        <h3 style={{ margin: "16px 0 6px" }}>通膨影響對照</h3>
+        <PurchasingPowerChart series={ppSeries} amount={1000000} unit={unit} />
+        <p className="note">{Math.max(0, c.inp.ageRetire - c.inp.ageNow)} 年後的 100 萬（名目），實際購買力相當於今天的 {fmtNum(ppAtRetire, unit)} {unitWord(unit)}（以通膨 {c.inp.inflation}% 計算）。</p>
+
+        <h3 style={{ margin: "16px 0 6px" }}>勞保勞退影響對照</h3>
+        {variants.length ? (
+          <table className="scen-table"><thead><tr><th>情況</th><th>最早可退休年齡</th><th>資產耗盡年齡</th></tr></thead>
+            <tbody>{variants.map((v) => (
+              <tr key={v.key}><th>{v.label}</th>
+                <td>{v.earliest.type === "age" ? `${v.earliest.age} 歲` : v.earliest.type === "already" ? "已退休" : "無法達成"}</td>
+                <td>{v.exhaustAge === null ? `撐到 ${c.inp.ageLife} 歲` : `${v.exhaustAge} 歲耗盡`}</td></tr>
+            ))}</tbody></table>
+        ) : (
+          <p className="note">未納入勞保與勞退（第 6 區未啟用），本對照不適用。</p>
+        )}
+        <p className="note">以上圖表都是依假設值推算的比較，不是預測，也不是投資建議。</p>
+      </div>
+    </div>
   );
 }

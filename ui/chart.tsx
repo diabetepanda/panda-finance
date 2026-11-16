@@ -159,3 +159,124 @@ export function ScenarioChart({ scenarios, mode, basis, unit, inflationByScenari
     </svg>
   );
 }
+
+// ---- Phase 3 圖表 ----
+
+/** 通用多線圖（配置比較用）：series 為 {label, points(age->資產), color, dash} */
+export function MultiLineChart({ series, unit }: {
+  series: { label: string; points: { age: number; v: number }[]; color: string; dash?: string }[];
+  unit: Unit;
+}) {
+  const W = 880, H = 280, L = 78, R = 14, T = 14, B = 34;
+  const all = series.flatMap((s) => s.points);
+  if (!all.length) return null;
+  const minAge = Math.min(...all.map((p) => p.age)), maxAge = Math.max(...all.map((p) => p.age));
+  const maxV = Math.max(...all.map((p) => p.v), 1);
+  const x = (age: number) => L + ((age - minAge) / Math.max(1, maxAge - minAge)) * (W - L - R);
+  const y = (v: number) => T + (1 - v / maxV) * (H - T - B);
+  const ticks = [0, 0.5, 1].map((f) => maxV * f);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }} role="img" aria-label="資產曲線比較圖">
+      {ticks.map((tv, i) => (
+        <g key={i}>
+          <line x1={L} x2={W - R} y1={y(tv)} y2={y(tv)} stroke="#e3e6e3" />
+          <text x={L - 6} y={y(tv) + 4} textAnchor="end" fontSize="11" fill="#667">{fmtNum(tv, unit)}</text>
+        </g>
+      ))}
+      {series.map((s) => (
+        <path key={s.label} d={s.points.map((p, i) => `${i ? "L" : "M"}${x(p.age).toFixed(1)},${y(p.v).toFixed(1)}`).join(" ")}
+          fill="none" stroke={s.color} strokeWidth={2} strokeDasharray={s.dash}>
+          <title>{s.label}</title>
+        </path>
+      ))}
+      {series.map((s, i) => (
+        <text key={s.label} x={L + i * 210} y={H - 10} fontSize="12" fill={s.color}>● {s.label}</text>
+      ))}
+    </svg>
+  );
+}
+
+/** 退休收入來源結構堆疊圖：每年支出由勞保、勞退、其他收入、資產提領（缺口）支應 */
+export function IncomeStackChart({ res, unit }: { res: SimResult; unit: Unit }) {
+  const rows = res.rows.filter((r) => r.phase === "retire");
+  if (!rows.length || !res.socialDetail) return null;
+  const W = 880, H = 260, L = 78, R = 14, T = 14, B = 30;
+  const maxV = Math.max(...rows.map((r) => r.expense), 1);
+  const bw = (W - L - R) / rows.length;
+  const y = (v: number) => T + (1 - v / maxV) * (H - T - B);
+  const colors = { li: "#3366aa", lp: "#5b8c5a", other: "#c9a227", gap: "#b3543f" };
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }} role="img" aria-label="退休收入來源結構圖">
+      {[0, 0.5, 1].map((f, i) => (
+        <g key={i}>
+          <line x1={L} x2={W - R} y1={y(maxV * f)} y2={y(maxV * f)} stroke="#e3e6e3" />
+          <text x={L - 6} y={y(maxV * f) + 4} textAnchor="end" fontSize="11" fill="#667">{fmtNum(maxV * f, unit)}</text>
+        </g>
+      ))}
+      {rows.map((r, i) => {
+        const other = Math.max(0, r.income - r.li - r.lp);
+        const segs: [number, string][] = [[r.li, colors.li], [r.lp, colors.lp], [other, colors.other], [r.gap, colors.gap]];
+        let acc = 0;
+        return (
+          <g key={r.age}>
+            {segs.map(([v, c], j) => {
+              if (v <= 0) return null;
+              const y1 = y(acc + v), h = y(acc) - y1;
+              acc += v;
+              return <rect key={j} x={L + i * bw + 0.5} y={y1} width={Math.max(1, bw - 1)} height={h} fill={c}><title>{`${r.age} 歲`}</title></rect>;
+            })}
+          </g>
+        );
+      })}
+      <text x={L} y={H - 8} fontSize="11" fill={colors.li}>■ 勞保年金</text>
+      <text x={L + 110} y={H - 8} fontSize="11" fill={colors.lp}>■ 勞退月領</text>
+      <text x={L + 220} y={H - 8} fontSize="11" fill={colors.other}>■ 其他收入</text>
+      <text x={L + 330} y={H - 8} fontSize="11" fill={colors.gap}>■ 資產提領（缺口）</text>
+    </svg>
+  );
+}
+
+/** 通膨影響對照：名目金額固定下，實質購買力隨年下降 */
+export function PurchasingPowerChart({ series, amount, unit }: {
+  series: { t: number; real: number }[]; amount: number; unit: Unit;
+}) {
+  const W = 880, H = 240, L = 78, R = 14, T = 14, B = 30;
+  if (!series.length) return null;
+  const maxT = Math.max(...series.map((p) => p.t), 1);
+  const x = (t: number) => L + (t / maxT) * (W - L - R);
+  const y = (v: number) => T + (1 - v / amount) * (H - T - B);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto" }} role="img" aria-label="通膨影響對照圖">
+      <line x1={L} x2={W - R} y1={y(amount)} y2={y(amount)} stroke="#999" strokeDasharray="5 4" />
+      <text x={L - 6} y={y(amount) + 4} textAnchor="end" fontSize="11" fill="#667">{fmtNum(amount, unit)}</text>
+      <path d={series.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.real).toFixed(1)}`).join(" ")} fill="none" stroke="#b3543f" strokeWidth={2}>
+        <title>實質購買力</title>
+      </path>
+      <text x={L} y={H - 8} fontSize="11" fill="#667">虛線：名目金額（不變）</text>
+      <text x={L + 190} y={H - 8} fontSize="11" fill="#b3543f">紅線：實質購買力</text>
+      <text x={W - R} y={H - 8} textAnchor="end" fontSize="11" fill="#667">{maxT} 年後</text>
+    </svg>
+  );
+}
+
+/** 標的比較區間條：保守（左）到樂觀（右），中性標記 */
+export function AssetRangeBars({ rows, unit }: {
+  rows: { label: string; cons: number; neu: number; opt: number }[]; unit: Unit;
+}) {
+  const maxV = Math.max(...rows.map((r) => r.opt), 1);
+  return (
+    <div>
+      {rows.map((r) => (
+        <div key={r.label} style={{ display: "flex", alignItems: "center", gap: 8, margin: "5px 0" }}>
+          <span style={{ width: 110, fontSize: ".9rem" }}>{r.label}</span>
+          <span style={{ position: "relative", flex: 1, height: 14, background: "#f0f2f0", borderRadius: 4 }}>
+            <span style={{ position: "absolute", left: `${(r.cons / maxV) * 100}%`, width: `${Math.max(1, ((r.opt - r.cons) / maxV) * 100)}%`, top: 2, height: 10, background: "#7fb08a", borderRadius: 3 }} />
+            <span style={{ position: "absolute", left: `calc(${(r.neu / maxV) * 100}% - 1px)`, top: 0, width: 2, height: 14, background: "#274e13" }} />
+          </span>
+          <span style={{ width: 210, fontSize: ".85rem", color: "#445" }}>{fmtNum(r.cons, unit)} ～ {fmtNum(r.opt, unit)}</span>
+        </div>
+      ))}
+      <p className="note">條 = 保守到樂觀，深色標記 = 中性。金額單位：{unit === "wan" ? "萬元" : "元"}（今日幣值）。</p>
+    </div>
+  );
+}
