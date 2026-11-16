@@ -240,3 +240,12 @@
       .legend .sw.work{ border-top:3px solid var(--chart-work); }
       .legend .sw.retire{ border-top:3px dashed var(--chart-ret); }
       .legend .sw.exhaust{ width:10px; height:10px; border-radius:50%; background:var(--chart-exhaust); }
+/* Phase 2 */
+.exp-cat{max-width:110px}
+.alloc-table,.scen-table{width:100%;border-collapse:collapse;font-size:.92rem}
+.alloc-table th,.alloc-table td,.scen-table th,.scen-table td{padding:6px 8px;border-bottom:1px solid #e7eae7;text-align:left;vertical-align:top}
+.alloc-table input{width:84px}
+.alloc-table .risk{color:#667;font-size:.8rem;display:block;margin-top:2px}
+.warn-strong{color:#a33;font-weight:600}
+.range-line{font-size:1.02rem;background:#eef6f0;border:1px solid #cfe3d4;border-radius:10px;padding:10px 12px}
+.seg button[aria-pressed="true"]{background:#2e7d4f;color:#fff}
