@@ -26,6 +26,7 @@ export const SOCIAL_PARAMS: ParamDef[] = [
   sp("lrEmployeeMaxRate", "勞退員工自提率上限", 6, "%", 0, 30, "自提率可調範圍 0 至此值。"),
   sp("lrWageCap", "勞退提繳工資上限", 150000, "元/月", 0, 10000000, "月提繳工資不得超過此上限。"),
   sp("lrFundReturn", "勞退基金收益率（名目）", 2, "%/年", -20, 30, "獨立參數，與投資報酬率分開；換算為實質收益率後逐年累積。"),
+  sp("lrLegalClaimAge", "勞退法定請領年齡", 60, "歲", 40, 80, "勞退實際開始領取年齡 = max(退休年齡, 此年齡）；退休到請領之間為空窗期，一次領的帳戶在此期間繼續以基金實質收益率累積（不再提繳）。"),
 ];
 
 export const SOCIAL_PARAM_MAP: Record<string, ParamDef> = Object.fromEntries(SOCIAL_PARAMS.map((d) => [d.id, d]));
