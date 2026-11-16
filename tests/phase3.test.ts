@@ -3,7 +3,8 @@ import { describe, it, expect } from "vitest";
 import { laborInsuranceMonthly, laborInsuranceRealAnnual, laborPensionMonthlyAnnual } from "../core/social";
 import { simulate, type SimInput } from "../core/simulate";
 import { computePhase1, resolveScenarioInflation } from "../core/compute";
-import { solveMonthlySaving, solveEarliestWithSaving } from "../core/goals";
+import { solveMonthlySaving, solveEarliestWithSaving, goalEarliestAnswers } from "../core/goals";
+import type { ScenariosOutcome } from "../core/compute";
 import { monthlyTotals } from "../core/compute";
 import { defaultFormInput } from "./helpers";
 import type { SocialInput } from "../core/social";
@@ -15,7 +16,7 @@ const socialBase: SocialInput = {
   },
   laborPension: {
     monthlyWage: 40000, employerRatePct: 6, employeeRatePct: 0,
-    fundReturnPct: 2, currentBalance: 0, mode: "lump",
+    fundReturnPct: 2, currentBalance: 0, mode: "lump", claimAge: 60,
   },
 };
 
@@ -120,5 +121,69 @@ describe("中性情境通膨連動（Phase 3 修正）", () => {
   it("手動修改後（unlinked）維持手動值，不受主畫面影響", () => {
     const raw = { conservative: 3, neutral: 4.2, optimistic: 1.5 };
     expect(resolveScenarioInflation(raw, false, 2.8).neutral).toBe(4.2);
+  });
+});
+
+describe("修正（2026-11-17）｜標的未啟用時反推走 UI 管線的單一答案", () => {
+  it("透過 UI 入口 goalEarliestAnswers（assetsEnabled=false），模式三 Z = 目前結餘 → 與主畫面最早退休年齡相同", () => {
+    const inp = defaultFormInput();
+    const scenStub: ScenariosOutcome = { paused: false, pauseReason: null, allocationTotalPct: 100, retireAllocationTotalPct: 100, scenarios: [] };
+    const answers = goalEarliestAnswers(false, inp, scenStub, monthlyTotals(inp).balance);
+    expect(answers).toHaveLength(1);
+    expect(answers[0].key).toBe("single");
+    const main = computePhase1(inp).earliest;
+    expect(answers[0].earliest).toEqual(main);
+    if (answers[0].earliest.type === "age" && main.type === "age") {
+      expect(answers[0].earliest.age).toBe(49);
+    } else {
+      throw new Error("expected age result");
+    }
+  });
+});
+
+describe("修正（2026-11-17）｜勞退請領年齡與空窗期", () => {
+  const mkInp = (mode: "lump" | "monthly"): SimInput => {
+    const inp = defaultFormInput();
+    inp.ageRetire = 50;
+    inp.social = {
+      laborInsurance: { ...socialBase.laborInsurance, claimAge: 65 },
+      laborPension: { ...socialBase.laborPension, mode, claimAge: 60, currentBalance: 0 },
+    };
+    return inp;
+  };
+  it("(a) 月領：退休 50、請領 60 → 50–59 歲勞退收入 0，60 歲起才有", () => {
+    const res = simulate(mkInp("monthly"), 50, 0);
+    const lpAt = (age: number) => res.rows.find((r) => r.age === age)!.lp;
+    for (let age = 51; age <= 59; age++) expect(lpAt(age)).toBe(0);
+    expect(lpAt(60)).toBeGreaterThan(0); // 滿 60 歲那一年起開始領
+    expect(lpAt(61)).toBeGreaterThan(0);
+    expect(res.socialDetail!.lpStartAge).toBe(60);
+    expect(res.socialDetail!.lpMonthlyAnnual).toBeGreaterThan(0);
+  });
+  it("(b) 一次領：退休當下資產不含勞退，60 歲那年才併入，金額 = 退休時帳戶 × (1+實質收益率)^10", () => {
+    const inp = mkInp("lump");
+    inp.inflation = 2; inp.retPost = 2; // rho = 0，排除退休後報酬干擾
+    inp.retireSpend = 0; inp.otherRetireIncome = 0; // 無支出，資產變化只來自併入
+    inp.social!.laborInsurance.indexed = true;
+    const res = simulate(inp, 50, 0);
+    const bal = res.socialDetail!.lpBalance;
+    expect(bal).toBeGreaterThan(0);
+    // 退休時資產（50 歲）不含勞退帳戶
+    const noSocial = simulate({ ...inp, social: null }, 50, 0);
+    expect(Math.abs(res.retireAssets - noSocial.retireAssets)).toBeLessThan(0.01);
+    const rf = (1 + 0.02) / (1 + 0.02) - 1; // 基金名目 2%、通膨 2% → 實質 0
+    const expected = bal * Math.pow(1 + rf, 10);
+    const row59 = res.rows.find((r) => r.age === 59)!;
+    const row60 = res.rows.find((r) => r.age === 60)!;
+    expect(Math.abs(row60.assets - row59.assets - expected)).toBeLessThan(0.01);
+    expect(Math.abs(res.socialDetail!.lpLumpAtClaim - expected)).toBeLessThan(0.01);
+  });
+  it("(b2) 一次領空窗期累積：基金實質收益率 > 0 時併入金額大於退休時帳戶", () => {
+    const inp = mkInp("lump");
+    inp.inflation = 0; // 實質收益率 = 基金名目 2%
+    const res = simulate(inp, 50, 0);
+    const bal = res.socialDetail!.lpBalance;
+    const expected = bal * Math.pow(1.02, 10);
+    expect(Math.abs(res.socialDetail!.lpLumpAtClaim - expected)).toBeLessThan(0.01);
   });
 });
