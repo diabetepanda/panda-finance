@@ -4,7 +4,7 @@
 
 import { simulate, type SimInput } from "./simulate";
 import { earliestRetirement, type EarliestResult } from "./retirement";
-import { monthlyTotals } from "./compute";
+import { monthlyTotals, type ScenariosOutcome } from "./compute";
 import { paramValue } from "../config/defaults";
 
 function lastsToLife(inp: SimInput, retireAge: number): { lasts: boolean; finalAssets: number; required: number } {
@@ -110,4 +110,30 @@ export function solveLumpSum(inp: SimInput, targetRetireAge: number): LumpSoluti
 export function solveEarliestWithSaving(inp: SimInput, monthlySavingZ: number): EarliestResult {
   const balance = monthlyTotals(inp).balance;
   return earliestRetirement({ ...inp, extraMonthlySaving: monthlySavingZ - balance });
+}
+
+// ---- UI 入口（介面實際使用的計算管線） ----
+// 標的未啟用時：反推只用與主畫面完全相同的假設（主畫面 inp）給一個答案，
+// 不得改用第 5 區保留的配置/情境（那會與主畫面報酬率對不起來，且偏樂觀）。
+// 標的啟用時：維持三種情境各給一個答案。
+export interface GoalRow { key: string; inp: SimInput }
+
+export function goalRows(assetsEnabled: boolean, mainInp: SimInput, scen: ScenariosOutcome): GoalRow[] {
+  if (!assetsEnabled) return [{ key: "single", inp: mainInp }];
+  return scen.scenarios.map((sc) => ({ key: sc.id, inp: sc.inp }));
+}
+
+export function goalSavingAnswers(assetsEnabled: boolean, mainInp: SimInput, scen: ScenariosOutcome, targetRetireAge: number) {
+  return goalRows(assetsEnabled, mainInp, scen).map((r) => ({ key: r.key, sol: solveMonthlySaving(r.inp, targetRetireAge) }));
+}
+
+export function goalSpendAnswers(assetsEnabled: boolean, mainInp: SimInput, scen: ScenariosOutcome, targetSpendMonthly: number) {
+  return goalRows(assetsEnabled, mainInp, scen).map((r) => {
+    const inpY: SimInput = { ...r.inp, retireSpend: targetSpendMonthly, retireSpendCategories: null };
+    return { key: r.key, saving: solveMonthlySaving(inpY, inpY.ageRetire), lump: solveLumpSum(inpY, inpY.ageRetire) };
+  });
+}
+
+export function goalEarliestAnswers(assetsEnabled: boolean, mainInp: SimInput, scen: ScenariosOutcome, monthlySavingZ: number) {
+  return goalRows(assetsEnabled, mainInp, scen).map((r) => ({ key: r.key, earliest: solveEarliestWithSaving(r.inp, monthlySavingZ) }));
 }

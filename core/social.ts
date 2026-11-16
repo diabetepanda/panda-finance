@@ -21,6 +21,7 @@ export interface LaborPensionInput {
   fundReturnPct: number; // 勞退基金收益率（名目%）
   currentBalance: number; // 目前個人帳戶累積（元，今日幣值）
   mode: "lump" | "monthly"; // 一次領 / 月領
+  claimAge: number; // 勞退法定請領年齡（使用者可調，預設見設定檔）
 }
 
 export interface SocialInput {
@@ -99,6 +100,17 @@ export function laborPensionAccumulate(
     balance = balance * (1 + rf) + realContrib;
   }
   return balance;
+}
+
+/** 勞退實際開始領取年齡 = max(退休年齡, 法定請領年齡)；之前為空窗期，收入 0 */
+export function laborPensionStartAge(lp: LaborPensionInput, retireAge: number): number {
+  return Math.max(retireAge, lp.claimAge);
+}
+
+/** 空窗期帳戶續累積：退休時帳戶以勞退基金實質收益率成長 waitYears 年（不再提繳） */
+export function laborPensionGrow(balanceAtRetire: number, fundReturnPct: number, inflationPct: number, waitYears: number): number {
+  const rf = realRate(fundReturnPct / 100, inflationPct / 100);
+  return balanceAtRetire * Math.pow(1 + rf, Math.max(0, waitYears));
 }
 
 /**

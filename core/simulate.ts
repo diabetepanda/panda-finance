@@ -9,7 +9,8 @@ import { pvAnnuity } from "./annuity";
 import type { CategoryId } from "../config/categories";
 import {
   plannedYearsAt, laborInsuranceMonthly, laborInsuranceRealAnnual,
-  laborPensionAccumulate, laborPensionMonthlyAnnual, type SocialInput,
+  laborPensionAccumulate, laborPensionMonthlyAnnual,
+  laborPensionStartAge, laborPensionGrow, type SocialInput,
 } from "./social";
 
 export interface ExpenseItem {
@@ -60,7 +61,11 @@ export interface SimRow {
 
 export interface SimResult {
   rows: SimRow[];
-  socialDetail: { liMonthlyToday: number; liYears: number; lpBalance: number; lpMonthlyAnnual: number } | null;
+  socialDetail: {
+    liMonthlyToday: number; liYears: number; lpBalance: number; lpMonthlyAnnual: number;
+    lpStartAge: number; // 勞退實際開始領取年齡 = max(退休年齡, 法定請領年齡)
+    lpLumpAtClaim: number; // 一次領：請領那一年併入資產的金額（含空窗期累積）；退休當下併入時為 0
+  } | null;
   retireAssets: number;
   required: number;
   achieve: number | null;
@@ -126,14 +131,21 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
   // ---- Phase 3：勞保勞退（依本次試算的退休年齡 R 重算） ----
   const social = inp.social ?? null;
   let liMonthlyToday = 0, liYears = 0, lpBalance = 0, lpMonthlyAnnual = 0;
+  let lpStartAge = R, lpLumpAtClaim = 0;
   if (social) {
     liYears = plannedYearsAt(social.laborInsurance, A, R);
     liMonthlyToday = laborInsuranceMonthly(social.laborInsurance, liYears);
     lpBalance = laborPensionAccumulate(social.laborPension, A, R, inp.salaryGrowth, inp.inflation);
+    // 勞退實際開始領取年齡 = max(退休年齡, 法定請領年齡)；退休到請領之間為空窗期。
+    // 空窗期內帳戶繼續以勞退基金實質收益率累積（不再提繳），到請領那一年才處理。
+    lpStartAge = laborPensionStartAge(social.laborPension, R);
+    const lpAtClaim = laborPensionGrow(lpBalance, social.laborPension.fundReturnPct, inp.inflation, lpStartAge - R);
     if (social.laborPension.mode === "lump") {
-      assets += lpBalance; // 一次領：併入退休時資產（第 6.3 節）
-    } else {
-      lpMonthlyAnnual = laborPensionMonthlyAnnual(lpBalance, social.laborPension.fundReturnPct, inp.inflation, retYears);
+      if (lpStartAge <= R) assets += lpBalance; // 無空窗期：退休當下併入資產
+      else lpLumpAtClaim = lpAtClaim; // 有空窗期：請領那一年才併入（金額含空窗期累積）
+    } else if (lpStartAge < L) {
+      // 月領：自開始領取年齡起，以基金實質收益率年金化、領到預期壽命
+      lpMonthlyAnnual = laborPensionMonthlyAnnual(lpAtClaim, social.laborPension.fundReturnPct, inp.inflation, L - lpStartAge);
     }
   }
 
@@ -160,7 +172,8 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
     if (social && R + k >= social.laborInsurance.claimAge) {
       li = laborInsuranceRealAnnual(liMonthlyToday, social.laborInsurance.indexed, inf, social.laborInsurance.claimAge - A, t2);
     }
-    const lp = social ? lpMonthlyAnnual : 0;
+    // 勞退月領：未到開始領取年齡（空窗期）為 0
+    const lp = social && R + k >= lpStartAge ? lpMonthlyAnnual : 0;
     const income = li + lp + annualOther;
     // 支出缺口 = max(0, 退休支出 − 勞保 − 勞退月領 − 其他收入)；超額不回投（第 6.4、3.5 節）
     return { expense: exp, shortfall: Math.max(0, exp - income), li, lp, income };
@@ -171,6 +184,8 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
   for (let k = 1; k <= retYears; k++) {
     const t2 = workYears + k, age = R + k;
     const { expense: retExpK, shortfall: shortfallK, li: liK, lp: lpK, income: incK } = retireYear(k);
+    // 一次領空窗期結束：到達請領年齡那一年，帳戶（含空窗期累積）併入資產
+    if (social && social.laborPension.mode === "lump" && age === lpStartAge && lpStartAge > R) assets += lpLumpAtClaim;
     const raw2 = assets * (1 + rho) - shortfallK;
     let endB = raw2;
     if (raw2 < -eps) {
@@ -197,7 +212,7 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
 
   return {
     rows, retireAssets, required,
-    socialDetail: social ? { liMonthlyToday, liYears, lpBalance, lpMonthlyAnnual } : null,
+    socialDetail: social ? { liMonthlyToday, liYears, lpBalance, lpMonthlyAnnual, lpStartAge, lpLumpAtClaim } : null,
     achieve: required > 0 ? retireAssets / required : null,
     exhaustAge, finalAssets: assets,
     workGap, workGapNom, uncovered, uncoveredNom,
