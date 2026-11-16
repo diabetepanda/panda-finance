@@ -1,5 +1,6 @@
 // ui/format.ts｜顯示格式化（只負責顯示，所有數字來自 core/config）
 import { TW_REGION } from "../config/regions/tw";
+import { realToNominal } from "../core/rates";
 
 export type Basis = "real" | "nominal";
 export type Unit = "wan" | "yuan";
@@ -30,7 +31,7 @@ export function basisTag(basis: Basis): string {
 
 /** 依目前口徑/單位格式化金額：realVal 為實質（今日幣值）金額，t 為經過年數 */
 export function fmtMoney(realVal: number, t: number, inflationPct: number, basis: Basis, unit: Unit): string {
-  const v = basis === "nominal" ? realVal * Math.pow(1 + inflationPct / 100, t) : realVal;
+  const v = basis === "nominal" ? realToNominal(realVal, inflationPct / 100, t) : realVal;
   return `${fmtNum(v, unit)} ${unitWord(unit)}${basisTag(basis)}`;
 }
 
