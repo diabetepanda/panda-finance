@@ -82,7 +82,7 @@
       .step-actions{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
       .conclusion-line{ font-size:1.5rem; font-weight:700; line-height:1.5; margin:16px 0 4px; }
       .etf-cards{ display:none; }
-      .tag-chip{ display:inline-block; font-size:.72rem; font-weight:600; color:var(--brand); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:1px 8px; vertical-align:middle; }
+      .tag-chip{ display:inline-block; font-size:.82rem; font-weight:600; color:var(--brand); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:1px 8px; vertical-align:middle; }
       .tablist{ display:flex; gap:6px; overflow-x:auto; border-bottom:2px solid var(--line); padding-bottom:0; }
       .tab-btn{ background:transparent; color:var(--ink-soft); border:1px solid var(--line); border-bottom:none; border-radius:10px 10px 0 0; white-space:nowrap; padding:9px 16px; }
       .tab-btn.current{ background:var(--surface); color:var(--ink); font-weight:700; border-color:var(--line); box-shadow:inset 0 -2px 0 var(--surface); }
@@ -97,32 +97,7 @@
       .howto-body h4{ margin:12px 0 4px; }
       .howto-body ul{ margin:4px 0; padding-left:20px; }
       button.linklike{ background:none; border:none; color:var(--brand); padding:0 2px; font-size:inherit; text-decoration:underline; }
-      @media (max-width:480px){
-        .step-actions button{ min-height:44px; flex:1 1 auto; }
-        input[type="number"], input[type="text"]{ font-size:16px; }
-        .conclusion-line{ font-size:1.3rem; }
-        .expense-row .del{ min-width:44px; min-height:44px; }
-        .tab-btn{ min-height:44px; }
-        summary{ min-height:44px; display:flex; align-items:center; }
-        .seg button{ min-height:44px; }
-        button.small{ min-height:44px; }
-        .howto-toggle{ min-height:44px; }
-        .table-scroll td, .table-scroll th{ white-space:nowrap; }
-        .table-scroll td:first-child, .table-scroll th:first-child{ white-space:normal; min-width:7em; }
-        /* 手機 ETF 改卡片式：隱藏表格、顯示卡片 */
-        .etf-table-wrap{ display:none; }
-        .etf-cards{ display:block; }
-        .etf-card{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:10px; background:var(--surface); }
-        .etf-card-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
-        .etf-card-head h4{ margin:0; font-size:.95rem; }
-        .etf-card-main{ margin-top:4px; white-space:nowrap; }
-        .etf-card-amount{ font-size:1.4rem; font-weight:700; color:var(--brand); }
-        .etf-card-sub{ font-size:.88rem; color:var(--ink-soft); margin:2px 0 0; white-space:nowrap; }
-        .etf-more summary{ font-weight:600; }
-        .etf-card-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-top:6px; }
-        .etf-card-grid span{ display:block; font-size:.82rem; color:var(--ink-soft); }
-        .etf-card-grid strong{ font-size:.92rem; white-space:nowrap; }
-      }
+      
       .card{
         background:var(--surface); border:1px solid var(--line); border-radius:14px;
         box-shadow:var(--shadow); margin-bottom:16px; overflow:hidden;
@@ -148,7 +123,7 @@
       }
       .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0 14px; }
       .grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 12px; }
-      @media (max-width:480px){ .grid3{ grid-template-columns:1fr 1fr; } }
+      
       .msg{ display:none; margin:10px 0 2px; padding:9px 12px; border-radius:8px; font-size:.9rem;
         background:var(--warn-bg); color:var(--warn-ink); border:1px solid var(--warn-line); }
       .msg.show{ display:block; }
@@ -177,11 +152,7 @@
         background:transparent; color:var(--chart-exhaust); border:1px solid var(--line);
         width:40px; padding:0; font-size:1.05rem; line-height:1;
       }
-      @media (max-width:480px){
-        .expense-head{ display:none; }
-        .expense-row{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px; }
-        .expense-row .f-end{ grid-column:1 / 3; }
-      }
+      
       .totals{
         margin-top:14px; background:var(--surface-2); border-radius:10px; padding:10px 14px; font-size:.95rem;
       }
@@ -197,7 +168,7 @@
       .toggle-row .tg-label{ font-size:.88rem; color:var(--ink-soft); margin-right:8px; }
       .summary-block{ }
       .summary-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
-      @media (max-width:480px){ .summary-grid{ grid-template-columns:1fr 1fr; gap:10px; } }
+      
       .sum-card{
         background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);
         padding:14px 16px;
@@ -235,10 +206,7 @@
       table.detail tbody tr{ border-bottom:1px solid var(--line); }
       table.detail tbody tr.retire-row{ background:var(--surface-2); }
       table.detail tbody tr.now-row td{ font-weight:700; }
-      @media (max-width:480px){
-        table.detail{ font-size:.8rem; }
-        table.detail th, table.detail td{ padding:6px 5px; }
-      }
+      
       .calc-notes p{ margin:.55em 0; font-size:.95rem; }
       .calc-notes ul{ margin:.4em 0 .8em; padding-left:1.3em; font-size:.95rem; }
       .calc-notes li{ margin:.3em 0; }
@@ -278,6 +246,16 @@
         .etf-table{ width:100%; table-layout:fixed; font-size:9pt; }
         .etf-table td, .etf-table th{ white-space:normal; word-break:break-word; padding:4px 5px; }
         .etf-table th:nth-child(11), .etf-table td:nth-child(11){ display:none; }
+        .etf-table th:nth-child(1){ width:10%; }
+        .etf-table th:nth-child(2){ width:7%; }
+        .etf-table th:nth-child(3){ width:5%; }
+        .etf-table th:nth-child(4){ width:6%; }
+        .etf-table th:nth-child(5){ width:7%; }
+        .etf-table th:nth-child(6){ width:9%; }
+        .etf-table th:nth-child(7){ width:10%; }
+        .etf-table th:nth-child(8){ width:10%; }
+        .etf-table th:nth-child(9){ width:11%; }
+        .etf-table th:nth-child(10){ width:25%; }
         .table-scroll{ overflow:visible; }
         table.detail, table.detail-table{ font-size:8.5pt; }
         table.detail td, table.detail th, table.detail-table td, table.detail-table th{ white-space:normal; word-break:break-word; }
@@ -317,3 +295,48 @@
 .warn-strong{color:#a33;font-weight:600}
 .range-line{font-size:1.02rem;background:#eef6f0;border:1px solid #cfe3d4;border-radius:10px;padding:10px 12px}
 .seg button[aria-pressed="true"]{background:#2e7d4f;color:#fff}
+
+/* ===== 手機（≤480px）規則一律放檔尾，確保同權重時覆蓋前面的一般規則 ===== */
+@media (max-width:480px){
+        .step-actions button{ min-height:44px; flex:1 1 auto; }
+        input[type="number"], input[type="text"]{ font-size:16px; }
+        .conclusion-line{ font-size:1.3rem; }
+        .expense-row .del{ min-width:44px; min-height:44px; }
+        .tab-btn{ min-height:44px; }
+        summary{ min-height:44px; display:flex; align-items:center; }
+        .seg button{ min-height:44px; }
+        button.small{ min-height:44px; }
+        .howto-toggle{ min-height:44px; }
+        .table-scroll td, .table-scroll th{ white-space:nowrap; }
+        .table-scroll td:first-child, .table-scroll th:first-child{ white-space:normal; min-width:7em; }
+        /* 手機 ETF 改卡片式：隱藏表格、顯示卡片 */
+        .etf-table-wrap{ display:none; }
+        .etf-cards{ display:block; }
+        .etf-card{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:10px; background:var(--surface); }
+        .etf-card-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+        .etf-card-head h4{ margin:0; font-size:.95rem; }
+        .etf-card-main{ margin-top:4px; white-space:nowrap; }
+        .etf-card-amount{ font-size:1.4rem; font-weight:700; color:var(--brand); }
+        .etf-card-sub{ font-size:.88rem; color:var(--ink-soft); margin:2px 0 0; }
+        .etf-more summary{ font-weight:600; }
+        .etf-card-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-top:6px; }
+        .etf-card-grid span{ display:block; font-size:.82rem; color:var(--ink-soft); }
+        .etf-card-grid strong{ font-size:.92rem; white-space:nowrap; }
+      }
+@media (max-width:480px){ .grid3{ grid-template-columns:1fr 1fr; } }
+@media (max-width:480px){
+        .expense-head{ display:none; }
+        .expense-row{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px; }
+        .expense-row .f-end{ grid-column:1 / 3; }
+      }
+@media (max-width:480px){ .summary-grid{ grid-template-columns:1fr 1fr; gap:10px; } }
+@media (max-width:480px){
+        table.detail{ font-size:.8rem; }
+        table.detail th, table.detail td{ padding:6px 5px; }
+      }
+      @media (max-width:480px){
+        label:has(> input[type="checkbox"]){ min-height:44px; display:flex; align-items:center; }
+        input[type="checkbox"]{ width:20px; height:20px; flex:none; }
+      }
+      .step-link{ display:inline-flex; align-items:center; min-height:44px; }
+      .nw{ white-space:nowrap; }
