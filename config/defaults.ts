@@ -114,3 +114,38 @@ export const EXAMPLE_EXPENSES: ExpenseDefault[] = [
 
 /** 還原預設值按鈕要還原的假設參數 id 清單 */
 export const ASSUMPTION_PARAM_IDS = ["inflation", "retPre", "retPost", "salaryGrowth"] as const;
+
+// ---- Phase 6 人生大目標預設（新增目標時帶入的範例值；金額皆為今日幣值） ----
+export interface LifeGoalPreset {
+  type: "house" | "car" | "other";
+  name: string;
+  price: number;
+  downMode: "amount" | "pct";
+  downValue: number;
+  extraCosts: number;
+  loanRatePct: number;
+  loanYears: number;
+  source: string;
+  note: string;
+}
+
+export const LIFE_GOAL_PRESETS: Record<"house" | "car" | "other", LifeGoalPreset> = {
+  house: {
+    type: "house", name: "買房", price: 10000000, downMode: "pct", downValue: 20,
+    extraCosts: 0, loanRatePct: 2.5, loanYears: 30,
+    source: "範例值（使用者應改成自己的數字）",
+    note: "總價 1,000 萬、頭期 20%、30 年為範例值。年利率 2.5% 為範例值。參考：中央銀行 115 年 9 月五大銀行新承做購屋貸款平均利率 2.315%（含利率較低的新青安貸款，一般方案多半較高）https://www.cbc.gov.tw/tw/cp-432-193064-9acd9-1.html ；請改成自己的核貸利率。",
+  },
+  car: {
+    type: "car", name: "買車", price: 900000, downMode: "amount", downValue: 300000,
+    extraCosts: 0, loanRatePct: 3, loanYears: 5,
+    source: "範例值（使用者應改成自己的數字）",
+    note: "全部是範例值，未查證，各車商與銀行方案差異很大，請以自己的報價為準。",
+  },
+  other: {
+    type: "other", name: "其他大筆支出", price: 0, downMode: "amount", downValue: 0,
+    extraCosts: 0, loanRatePct: 0, loanYears: 0,
+    source: "範例值（使用者應改成自己的數字）",
+    note: "總價 0、不貸款（年數 0），由使用者自行填寫。",
+  },
+};
