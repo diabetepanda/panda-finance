@@ -160,21 +160,23 @@ function BaseDetails({ c, basis, unit, onCsv, socialStatusText }: {
       {(inp.lifeGoals?.length ?? 0) > 0 && (() => {
         const impact = goalsImpact(inp);
         const fmtE = (e: typeof impact.withEarliest) => (e.type === "age" ? `${e.age} 歲` : e.type === "already" ? "已退休" : "無法達成");
-        const diffWan = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmtNum(Math.abs(v), unit)} ${unitWord(unit)}`;
+        const moneyParts = (v: number, t: number) => { const cv = basis === "nominal" ? realToNominal(v, inp.inflation / 100, t) : v; return <>{fmtNum(cv, unit)} <span className="unit-word">{unitWord(unit)}{basisTag(basis)}</span></>; };
+        const diffParts = (v: number) => <>{v > 0 ? "+" : v < 0 ? "−" : ""}{fmtNum(Math.abs(v), unit)} <span className="unit-word">{unitWord(unit)}</span></>;
         return (
           <div className="card chart-block" style={{ marginTop: 16 }}>
             <div className="card-head"><h2>人生大目標的影響</h2></div>
             <div className="card-body">
               <div className="table-scroll">
-                <table className="result-table">
+                <table className="result-table impact-table">
                   <tbody>
                     <tr><th></th><th>有大目標</th><th>沒有大目標</th><th>差距</th></tr>
                     <tr><th>最早可退休年齡</th><td>{fmtE(impact.withEarliest)}</td><td>{fmtE(impact.withoutEarliest)}</td><td>{impact.earliestDiffYears === null ? "—" : impact.earliestDiffYears === 0 ? "相同" : impact.earliestDiffYears > 0 ? `晚了 ${impact.earliestDiffYears} 年` : `早了 ${-impact.earliestDiffYears} 年`}</td></tr>
-                    <tr><th>預計退休時資產</th><td>{money(impact.withRetireAssets, R - A)}</td><td>{money(impact.withoutRetireAssets, R - A)}</td><td>{diffWan(impact.retireAssetsDiff)}</td></tr>
-                    <tr><th>預期壽命時剩餘資產</th><td>{money(impact.withFinalAssets, L - A)}</td><td>{money(impact.withoutFinalAssets, L - A)}</td><td>{diffWan(impact.finalAssetsDiff)}</td></tr>
+                    <tr><th>預計退休時資產</th><td>{moneyParts(impact.withRetireAssets, R - A)}</td><td>{moneyParts(impact.withoutRetireAssets, R - A)}</td><td>{diffParts(impact.retireAssetsDiff)}</td></tr>
+                    <tr><th>預期壽命時剩餘資產</th><td>{moneyParts(impact.withFinalAssets, L - A)}</td><td>{moneyParts(impact.withoutFinalAssets, L - A)}</td><td>{diffParts(impact.finalAssetsDiff)}</td></tr>
                   </tbody>
                 </table>
               </div>
+              <p className="note impact-unit-note" hidden>單位：{unitWord(unit)}{basisTag(basis)}。</p>
               <p className="note">「沒有大目標」是同一組輸入、只把人生大目標拿掉的對照，用來看出大目標對退休時間與資產的影響。</p>
             </div>
           </div>
