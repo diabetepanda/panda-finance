@@ -1,5 +1,5 @@
 // core/social.ts｜勞保老年年金與勞退新制（規格第 6.2、6.3 節）
-// 純函式。所有制度數字來自 config/social.ts（假設參數，待查證）。
+// 純函式。所有制度數字來自 config/social.ts（Phase 3.2 已依官方來源查證；勞退基金收益率為假設值）。
 
 import { realRate } from "./rates";
 import { pvAnnuity } from "./annuity";
@@ -36,13 +36,19 @@ export function plannedYearsAt(li: LaborInsuranceInput, ageNow: number, retireAg
 
 /**
  * 勞保月領年金（今日幣值，元/月）：
- * 未調整 = 平均月投保薪資 × 年資 × 費率（第 6.2 節）；
- * 提前請領每提前 1 年減給、延後每延後 1 年增給（各有年數上限，參數在設定檔）；
- * 最後套用打折。
+ * 未調整金額依勞工保險條例第 58-1 條「兩式擇優」：
+ *   第一式 = 平均月投保薪資 × 年資 × 0.775% ＋ 3,000 元
+ *   第二式 = 平均月投保薪資 × 年資 × 1.55%
+ *   base = max(第一式, 第二式)
+ * 3,000 元為法定名目定額，本工具當今日幣值處理（簡化見 ASSUMPTIONS.md）。
+ * 之後套用提前減給／延後增給（第 58-2 條對「依前條計算之給付金額」整筆計算，
+ * 故 3,000 元一併乘算），最後套用打折。
  */
 export function laborInsuranceMonthly(li: LaborInsuranceInput, years: number): number {
   const salary = Math.min(li.avgInsuredSalary, socialParamValue("liSalaryCap"));
-  const base = salary * years * (socialParamValue("liRatePerYear") / 100);
+  const formula1 = salary * years * (socialParamValue("liRateAltPerYear") / 100) + socialParamValue("liFixedAddon");
+  const formula2 = salary * years * (socialParamValue("liRatePerYear") / 100);
+  const base = Math.max(formula1, formula2);
   const legal = socialParamValue("liLegalClaimAge");
   let factor = 1;
   if (li.claimAge < legal) {
@@ -123,4 +129,16 @@ export function laborPensionMonthlyAnnual(balanceAtRetire: number, fundReturnPct
   const rf = realRate(fundReturnPct / 100, inflationPct / 100);
   const factor = pvAnnuity(1, rf, years);
   return factor > 0 ? balanceAtRetire / factor : balanceAtRetire / years;
+}
+
+/**
+ * 勞退月領資格提示旗標（勞工退休金條例第 24 條第 1 項）：
+ * 選月領且提繳年資未滿 lrMinYearsMonthly（15 年）時為 true。
+ * 年資以「現在年齡到退休年齡的年數」近似（工具未輸入過去勞退年資，見 ASSUMPTIONS.md）。
+ * 只影響提示，計算邏輯不變。
+ */
+export function laborPensionMonthlyEligibilityWarning(lp: LaborPensionInput, ageNow: number, retireAge: number): boolean {
+  if (lp.mode !== "monthly") return false;
+  const approxYears = Math.max(0, retireAge - ageNow);
+  return approxYears < socialParamValue("lrMinYearsMonthly");
 }
