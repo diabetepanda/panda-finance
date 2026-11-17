@@ -27,12 +27,13 @@ export default function StepSocial({ form, set, inp, computed, howToOpen, setHow
   const estimateMode = choice === "unsure" || form.socialInputMode === "estimate";
   const grossNum = form.grossSalary.trim() === "" ? NaN : num(form.grossSalary);
   const basis = wageBasis(grossNum, num(form.monthlyIncome));
-  const estYears = estimateExistingYears(num(form.ageNow), num(form.startWorkAge));
+  const startWorkNum = form.startWorkAge.trim() === "" ? NaN : num(form.startWorkAge);
+  const estYears = estimateExistingYears(num(form.ageNow), startWorkNum);
   const estLiSalary = estimateInsuredSalary(basis);
   const estLrWage = form.lrWageManual ? num(form.lrWage) : estimateLrWage(basis);
   const estBalance = estimateLrBalance(estYears, estLrWage, num(form.lrEmployerRate));
   const existingForMode = estimateMode ? estYears : num(form.liExistingYears);
-  const choiceMsgs = validateSocialChoice({ ageNow: num(form.ageNow), startWorkAge: num(form.startWorkAge), grossSalary: grossNum });
+  const choiceMsgs = validateSocialChoice({ ageNow: num(form.ageNow), startWorkAge: startWorkNum, grossSalary: grossNum });
   const detail = computed?.res.socialDetail ?? null;
 
   const seedManual = () => set({
@@ -70,6 +71,7 @@ export default function StepSocial({ form, set, inp, computed, howToOpen, setHow
                   <label htmlFor="startWorkAge">你幾歲開始做全職工作</label>
                   <input id="startWorkAge" type="number" inputMode="numeric" step="1" value={form.startWorkAge} onChange={(e) => set({ startWorkAge: e.target.value })} />
                   <p className="note">範例：30 歲剛開始工作，所以目前勞保年資是 0 年。中間有一段時間沒工作的話，可以把開始年齡往後調。</p>
+                  {form.startWorkAge.trim() === "" && <p className="note">沒有填開始工作年齡，先以 0 年計算。</p>}
                 </div>
                 <div>
                   <label htmlFor="grossSalary">稅前月薪（選填） <span className="unit-hint">（元）</span></label>

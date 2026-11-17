@@ -1,6 +1,7 @@
 // ui/steps/stepHelpers.tsx｜步驟元件共用小工具
 import type { SimInput } from "../../core/simulate";
 import { salaryRealGrowth } from "../../core/compute";
+import { workYears } from "../../core/retirement";
 import { nominalToReal } from "../../core/rates";
 import { fmtPlain, fmtRatePct } from "../format";
 
@@ -9,7 +10,7 @@ export { defaultRetireSpend } from "../../core/retirement";
 /** 「薪水有沒有跑贏通膨」說明段（Phase 5 起放在步驟 ② 的進階裡，內容沿用舊版） */
 export function salaryRealGrowthNote(inp: SimInput) {
   const g = salaryRealGrowth(inp);
-  const years = Math.max(0, inp.ageRetire - inp.ageNow);
+  const years = workYears(inp);
   const pp = nominalToReal(inp.monthlyIncome, inp.inflation / 100, years);
   return (
     <p className="note">
