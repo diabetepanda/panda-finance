@@ -1164,7 +1164,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
   const workYears = Math.max(0, inp.ageRetire - inp.ageNow);
   const dyn = cmp.dyn;
   const dynStatement = stepPct > 0 ? (
-    <>這個結果假設你的定期定額金額會隨薪水每年調高 {fmtPlain(stepPct)}%：第 1 年每月 {fmtPlain(dyn.aMonthly)} 元 → 第 {dyn.years} 年每月約 {fmtPlain(Math.round(dyn.lastMonthlyNominal))} 元（今日幣值約 {fmtPlain(Math.round(dyn.lastMonthlyReal))} 元）。你必須真的每年跟著加碼，才會得到這個金額；如果金額一直不變，結果會是 {fmtPlain(Math.round(dyn.fixedRetireAssetsReal))} 元（今日幣值）／{fmtPlain(Math.round(dyn.fixedRetireAssetsNominal))} 元（名目）。</>
+    <>這個結果假設你的定期定額金額會隨薪水每年調高 {fmtRatePct(stepPct / 100)}：第 1 年每月 {fmtPlain(dyn.aMonthly)} 元 → 第 {dyn.years} 年每月約 {fmtPlain(Math.round(dyn.lastMonthlyNominal))} 元（今日幣值約 {fmtPlain(Math.round(dyn.lastMonthlyReal))} 元）。你必須真的每年跟著加碼，才會得到這個金額；如果金額一直不變，結果會是 {fmtPlain(Math.round(dyn.fixedRetireAssetsReal))} 元（今日幣值）／{fmtPlain(Math.round(dyn.fixedRetireAssetsNominal))} 元（名目）。</>
   ) : (
     <>這個結果假設你每月固定投入 {fmtPlain(dyn.aMonthly)} 元，不調高。</>
   );
@@ -1200,14 +1200,14 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
             <div>
               <label htmlFor="dcaStep">每年調高幅度 <span className="unit-hint">（%，填 0 表示金額固定不變）</span></label>
               <input id="dcaStep" type="number" inputMode="decimal" step="any" placeholder={String(inp.salaryGrowth)} value={stepStr} onChange={(e) => setStepStr(e.target.value)} />
-              <p className="note">留空＝使用薪資成長率 {fmtPlain(inp.salaryGrowth)}%。</p>
+              <p className="note">留空＝使用薪資成長率 {fmtRatePct(inp.salaryGrowth / 100)}。</p>
             </div>
           </div>
           <div className="table-scroll">
             <table className="scen-table">
               <thead><tr><th></th><th>每年加碼</th><th>固定金額</th></tr></thead>
               <tbody>
-                <tr><th>全部放定存（{fmtPlain(cashRet)}%）</th><td>{cellText(cmp.cashStepped)}</td><td>{cellText(cmp.cashFixed)}</td></tr>
+                <tr><th>全部放定存（{fmtRatePct(cashRet / 100)}）</th><td>{cellText(cmp.cashStepped)}</td><td>{cellText(cmp.cashFixed)}</td></tr>
                 <tr><th>大盤型 ETF 為主的組合（第 3 區報酬率）</th><td>{cellText(cmp.marketStepped)}</td><td>{cellText(cmp.marketFixed)}</td></tr>
               </tbody>
             </table>
@@ -1227,7 +1227,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
             <label htmlFor="dcaYears">試算年限 <span className="unit-hint">（年，1–50）</span></label>
             <input id="dcaYears" type="number" inputMode="numeric" step="1" value={yearsStr} onChange={(e) => setYearsStr(e.target.value)} />
           </div>
-          <p className="note">每月金額與每年調高幅度使用上方投資對照卡的同一組欄位（每月 {fmtPlain(monthly)} 元、每年調高 {fmtPlain(stepPct)}%）。</p>
+          <p className="note">每月金額與每年調高幅度使用上方投資對照卡的同一組欄位（每月 {fmtPlain(monthly)} 元、每年調高 {fmtRatePct(stepPct / 100)}）。</p>
           <div className="callout">{dynStatement}</div>
           <p className="note">試算一律使用本站的假設報酬（推算邏輯見 PARAMETERS.md），不是各 ETF 的歷史報酬；歷史報酬欄只是參考，成立時間短的參考價值更低。</p>
           <p className="note">{COMPLIANCE}</p>
@@ -1245,13 +1245,13 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
                     <td>{a.category}</td>
                     <td>{a.inceptionDate ? a.inceptionDate.slice(0, 4) : "—"}</td>
                     <td>{a.expenseRatioPct !== null ? `${a.expenseRatioPct}%` : "—"}</td>
-                    <td>{fmtPlain(a.returns.neutral.value)}%</td>
+                    <td>{fmtRatePct(a.returns.neutral.value / 100)}</td>
                     <td>{fmtNum(pick(pair.stepped.principalReal, pair.stepped.principalNominal), unit)}</td>
                     <td>{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)}</td>
                     <td>{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)}</td>
                     <td>{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</td>
                     <td>{a.histAnnualPct !== null && a.histYears !== null
-                      ? <>{fmtPlain(a.histAnnualPct)}%（成立 {a.histYears} 年，僅供參考）{a.histYears < 10 ? "；歷史太短，未經歷完整多空循環" : ""}{a.histExtra ? `；${a.histExtra}` : ""}</>
+                      ? <>{fmtRatePct(a.histAnnualPct / 100)}（成立 {a.histYears} 年，僅供參考）{a.histYears < 10 ? "；歷史太短，未經歷完整多空循環" : ""}{a.histExtra ? `；${a.histExtra}` : ""}</>
                       : "—"}</td>
                     <td className="risk-cell">{a.riskNote}</td>
                   </tr>
