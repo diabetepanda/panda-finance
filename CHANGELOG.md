@@ -1,5 +1,10 @@
 # CHANGELOG｜變更紀錄
 
+## Phase 5.6（2026-11-17）
+- 列印 ETF 表：第 9 欄「保守–樂觀區間」改回可換行（nowrap 只套第 3–8 欄），兩個數字各自以 .nw 包住，自然折成兩行、不在數字中間斷開，不再疊到歷史欄文字上。
+- 列印表頭字級改 7.5pt（td 維持 8.5pt）；欄寬微調：本金 8%→9%、歷史 23%→22%。
+- 只改 @media print 區塊，螢幕樣式、計算與 91 項測試皆未變動。
+
 ## Phase 5.5（2026-11-17）
 - 手機：結果頁「匯出設定檔（JSON）」「列印 / 另存 PDF」（.ghost／.save-row）補上 min-height:44px；全站 button 類別已盤點（ghost small、ghost、seg、step-tab、tab-btn、howto-toggle、del、step-actions、summary、checkbox label 皆有手機 44px 規則）。step-link 的 44px 改為只在手機套用。
 - 手機 ETF 卡片：主數字行改 flex-wrap（金額與「（30 年後，每年加碼）」各自不換行、空間不夠整段折行），卡片與容器加 min-width:0／max-width:100%，不再被內容撐寬。
