@@ -1,8 +1,9 @@
 // ui/steps/StepCashflow.tsx｜步驟 ② 每個月的錢（規格 Phase 5 第三節）
-import type { FormState } from "../form";
+import type { FormState, LifeGoalRow } from "../form";
 import { num } from "../form";
 import { defaultRetireSpend, salaryRealGrowthNote } from "./stepHelpers";
-import { paramValue } from "../../config/defaults";
+import { paramValue, LIFE_GOAL_PRESETS } from "../../config/defaults";
+import { goalCardSummary, goalShortfallWarnings, type LifeGoal } from "../../core/lifeGoals";
 import { fmtPlain, fmtPct } from "../format";
 import type { CategoryId } from "../../config/categories";
 import type { SimInput } from "../../core/simulate";
@@ -18,6 +19,7 @@ export default function StepCashflow({ form, set, inp, incomeErrors }: {
   const ratio = paramValue("retireSpendRatio");
   const setExpense = (i: number, patch: Partial<FormState["expenses"][number]>) =>
     set({ expenses: form.expenses.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+  const shortfallWarnings = goalShortfallWarnings(inp);
 
   return (
     <div className="card"><div className="card-body">
@@ -59,6 +61,98 @@ export default function StepCashflow({ form, set, inp, incomeErrors }: {
           <button type="button" className="ghost small" onClick={() => set({ retireManual: false, retireSpend: "" })}>恢復為目前支出的 {ratio}%</button>
         )}
       </div>
+
+      <details className="adv">
+        <summary>人生大目標（選填）</summary>
+        <p className="note">買房、買車或其他大筆支出：購買那一年會先付頭期款，之後每年還貸款。沒有要新增就不用打開，結果和先前完全相同。</p>
+        {(() => {
+          const houseGoal = form.lifeGoals.find((g) => g.type === "house");
+          if (!houseGoal) return null;
+          const pa = houseGoal.purchaseAge;
+          return (
+            <div className="soft-hint show" style={{ marginBottom: 10 }}>
+              <p style={{ margin: "0 0 6px" }}>支出清單裡如果已經有「房租或房貸」，買房後通常要停掉：請在該筆支出填「到 {pa} 歲結束」（{pa} = 購買年齡），或刪除既有房貸，以免重複計算。</p>
+              <button type="button" className="ghost small" onClick={() => set({
+                expenses: form.expenses.map((e) => (e.name.includes("房租") || e.name.includes("房貸") ? { ...e, endAge: pa } : e)),
+                showExpenseEndAge: true,
+              })}>幫我把「房租或房貸」設定到 {pa} 歲結束</button>
+            </div>
+          );
+        })()}
+        {form.lifeGoals.map((g, i) => {
+          const setGoal = (patch: Partial<LifeGoalRow>) => set({ lifeGoals: form.lifeGoals.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+          const coreGoal: LifeGoal = {
+            name: g.name, type: g.type, purchaseAge: num(g.purchaseAge), price: num(g.price),
+            downMode: g.downMode, downValue: num(g.downValue), extraCosts: num(g.extraCosts),
+            loanRatePct: num(g.loanRatePct), loanYears: num(g.loanYears),
+          };
+          const sum = goalCardSummary(coreGoal, num(form.ageNow), inp.inflation);
+          const warn = shortfallWarnings.find((w) => w.startsWith(`${g.purchaseAge} 歲買${g.name}`));
+          const idp = `goal${i}`;
+          return (
+            <div className="goal-card" key={i}>
+              <div className="goal-field">
+                <label htmlFor={`${idp}-name`}>名稱</label>
+                <input id={`${idp}-name`} type="text" value={g.name} onChange={(e) => setGoal({ name: e.target.value })} />
+              </div>
+              <div className="goal-field">
+                <label htmlFor={`${idp}-age`}>哪一歲買 <span className="unit-hint">（歲）</span></label>
+                <input id={`${idp}-age`} type="number" inputMode="numeric" step="1" value={g.purchaseAge} onChange={(e) => setGoal({ purchaseAge: e.target.value })} />
+              </div>
+              <div className="goal-field">
+                <label htmlFor={`${idp}-price`}>總價 <span className="unit-hint">（元，今日幣值）</span></label>
+                <input id={`${idp}-price`} type="number" inputMode="decimal" step="any" value={g.price} onChange={(e) => setGoal({ price: e.target.value })} />
+              </div>
+              <div className="goal-field">
+                <label>頭期款</label>
+                <span className="seg" role="group" aria-label="頭期款輸入方式">
+                  <button type="button" aria-pressed={g.downMode === "amount"} onClick={() => setGoal({ downMode: "amount" })}>金額</button>
+                  <button type="button" aria-pressed={g.downMode === "pct"} onClick={() => setGoal({ downMode: "pct" })}>百分比</button>
+                </span>
+                <input type="number" inputMode="decimal" step="any" aria-label={g.downMode === "pct" ? "頭期款百分比（%）" : "頭期款金額（元）"} value={g.downValue} onChange={(e) => setGoal({ downValue: e.target.value })} />
+                <span className="unit-hint">{g.downMode === "pct" ? "（%）" : "（元）"}</span>
+              </div>
+              <div className="goal-field">
+                <label htmlFor={`${idp}-extra`}>一次性額外費用 <span className="unit-hint">（元，選填，例如稅費、裝潢）</span></label>
+                <input id={`${idp}-extra`} type="number" inputMode="decimal" step="any" value={g.extraCosts} onChange={(e) => setGoal({ extraCosts: e.target.value })} />
+              </div>
+              <div className="goal-field">
+                <label htmlFor={`${idp}-rate`}>貸款年利率 <span className="unit-hint">（%）</span></label>
+                <input id={`${idp}-rate`} type="number" inputMode="decimal" step="any" value={g.loanRatePct} onChange={(e) => setGoal({ loanRatePct: e.target.value })} />
+              </div>
+              <div className="goal-field">
+                <label htmlFor={`${idp}-years`}>貸款年數 <span className="unit-hint">（年，0 代表不貸款）</span></label>
+                <input id={`${idp}-years`} type="number" inputMode="numeric" step="1" value={g.loanYears} onChange={(e) => setGoal({ loanYears: e.target.value })} />
+              </div>
+              <p className="note" style={{ margin: "8px 0 0" }}>
+                貸款金額 {fmtPlain(Math.round(sum.loanAmount))} 元（今日幣值）。每月還款 {fmtPlain(Math.round(sum.monthlyNominal))} 元（帳面金額，每月固定），首年約當今日幣值 {fmtPlain(Math.round(sum.firstYearMonthlyReal))} 元。{sum.payoffAge > num(g.purchaseAge) ? `預計 ${sum.payoffAge} 歲還清。` : "不貸款。"}
+              </p>
+              {warn && <p className="soft-hint show" style={{ marginTop: 8 }}>{warn}</p>}
+              <div style={{ marginTop: 8 }}>
+                <button type="button" className="ghost small" onClick={() => set({ lifeGoals: form.lifeGoals.filter((_, j) => j !== i) })}>刪除這筆大目標</button>
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+          {(["house", "car", "other"] as const).map((t) => {
+            const preset = LIFE_GOAL_PRESETS[t];
+            return (
+              <button key={t} type="button" className="ghost small" disabled={form.lifeGoals.length >= 5}
+                onClick={() => set({ lifeGoals: [...form.lifeGoals, {
+                  name: preset.name, type: preset.type,
+                  purchaseAge: String(num(form.ageNow) + (t === "house" ? 10 : 5)),
+                  price: String(preset.price), downMode: preset.downMode, downValue: String(preset.downValue),
+                  extraCosts: String(preset.extraCosts), loanRatePct: String(preset.loanRatePct), loanYears: String(preset.loanYears),
+                }] })}>
+                {t === "house" ? "＋買房" : t === "car" ? "＋買車" : "＋其他"}
+              </button>
+            );
+          })}
+        </div>
+        {form.lifeGoals.length >= 5 && <p className="note">人生大目標最多 5 筆。</p>}
+        <p className="note" style={{ marginTop: 10 }}>以下為假設值試算的教育性示範，非貸款或投資建議；實際利率、成數與費用以金融機構核定為準。</p>
+      </details>
 
       <details className="adv">
         <summary>進階</summary>
