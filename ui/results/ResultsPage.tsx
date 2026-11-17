@@ -552,6 +552,12 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
     return { a, pair, cons, opt };
   });
   const pick = (real: number, nominal: number) => (basis === "nominal" ? nominal : real);
+  const histText = (a: (typeof ASSETS)[number]): string =>
+    a.histNote
+      ? a.histNote
+      : a.histAnnualPct !== null && a.histYears !== null
+        ? `${fmtRatePct(a.histAnnualPct / 100)}（成立 ${a.histYears} 年，僅供參考）${a.histYears < 10 ? "；歷史太短，未經歷完整多空循環" : ""}${a.histExtra ? `；${a.histExtra}` : ""}`
+        : "—";
   const chartSeries = etfRows.map((r, i) => ({
     label: r.a.id === "cash" ? "定存（基準）" : r.a.label,
     color: DCA_COLORS[i % DCA_COLORS.length],
@@ -603,7 +609,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
           <div className="callout">{dynStatement}</div>
           <p className="note">試算一律使用本站的假設報酬（推算邏輯見 PARAMETERS.md），不是各 ETF 的歷史報酬；歷史報酬欄只是參考，成立時間短的參考價值更低。</p>
           <p className="note">{COMPLIANCE}</p>
-          <div className="table-scroll">
+          <div className="table-scroll etf-table-wrap">
             <table className="scen-table etf-table">
               <thead><tr>
                 <th>名稱</th><th>類型</th><th>成立年份</th><th>總費用率（2025 年度）</th><th>中性假設年化報酬</th>
@@ -622,16 +628,35 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
                     <td>{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)}</td>
                     <td>{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)}</td>
                     <td>{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</td>
-                    <td>{a.histNote
-                      ? a.histNote
-                      : a.histAnnualPct !== null && a.histYears !== null
-                        ? <>{fmtRatePct(a.histAnnualPct / 100)}（成立 {a.histYears} 年，僅供參考）{a.histYears < 10 ? "；歷史太短，未經歷完整多空循環" : ""}{a.histExtra ? `；${a.histExtra}` : ""}</>
-                        : "—"}</td>
+                    <td>{histText(a)}</td>
                     <td className="risk-cell">{a.riskNote}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="etf-cards" role="list">
+            {etfRows.map(({ a, pair, cons, opt }) => (
+              <article className="etf-card" role="listitem" key={a.id}>
+                <div className="etf-card-head">
+                  <h4>{a.id === "cash" ? "定存（基準）" : a.label} <span className="tag-chip">{a.category.replace("（產業集中）", "")}</span></h4>
+                  <span className="unit-hint">{a.inceptionDate ? `成立 ${a.inceptionDate.slice(0, 4)} 年` : ""}</span>
+                </div>
+                <div className="etf-card-main">
+                  <span className="etf-card-amount">{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)} {unitWord(unit)}</span>
+                  <span className="unit-hint">（{years} 年後，每年加碼）</span>
+                </div>
+                <p className="note">固定金額：{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)} {unitWord(unit)}</p>
+                <div className="etf-card-grid">
+                  <div><span>中性假設年化報酬</span><strong>{fmtRatePct(a.returns.neutral.value / 100)}</strong></div>
+                  <div><span>保守–樂觀區間（每年加碼）</span><strong>{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</strong></div>
+                  <div><span>總費用率</span><strong>{a.expenseRatioPct !== null ? `${a.expenseRatioPct}%` : "—"}</strong></div>
+                  <div><span>累積投入本金</span><strong>{fmtNum(pick(pair.stepped.principalReal, pair.stepped.principalNominal), unit)} {unitWord(unit)}</strong></div>
+                </div>
+                <p className="note">成立以來實際含息年化（參考）：{histText(a)}</p>
+                <details className="etf-risk"><summary>風險提示</summary><p className="note">{a.riskNote}</p></details>
+              </article>
+            ))}
           </div>
           <p className="note">金額單位：{unitWord(unit)}（{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）。</p>
           <h3 style={{ margin: "14px 0 6px" }}>累積曲線（中性、每年加碼）</h3>
