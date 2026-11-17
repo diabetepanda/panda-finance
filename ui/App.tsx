@@ -3,18 +3,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { SimInput, SimResult } from "../core/simulate";
 import type { EarliestResult } from "../core/retirement";
-import { defaultRetireSpend, defaultRetireSpendByCategory } from "../core/retirement";
+import { defaultRetireSpend } from "../core/retirement";
 import { findExtraSavingForEarliest, type ExtraSavingSolution } from "../core/solver";
 import { validateInput } from "../core/validate";
-import { computePhase1, computeScenarios, monthlyTotals, salaryRealGrowth, totalsByCategory, defaultScenarioInflation, resolveScenarioInflation, type ScenariosOutcome, type ScenarioOutcome } from "../core/compute";
+import { computePhase1, computeScenarios, monthlyTotals, salaryRealGrowth, defaultScenarioInflation, type ScenariosOutcome, type ScenarioOutcome } from "../core/compute";
 import { laborPensionMonthlyEligibilityWarning, type SocialInput } from "../core/social";
 import { socialParamValue, bracketFor, LI_SALARY_BRACKETS, LR_WAGE_BRACKETS } from "../config/social";
 import { goalSavingAnswers, goalSpendAnswers, goalEarliestAnswers } from "../core/goals";
 import { assetComparison, purchasingPowerSeries, socialVariants } from "../core/compare";
 import { realToNominal, nominalToReal } from "../core/rates";
 import { paramValue, EXAMPLE_EXPENSES } from "../config/defaults";
-import { ASSETS, ALLOCATION_PRESETS, SCENARIO_IDS, SCENARIO_LABELS, type ScenarioId } from "../config/assets";
-import { EXPENSE_CATEGORIES, CATEGORY_IDS, defaultCategoryFor, type CategoryId } from "../config/categories";
+import { ASSETS, ASSET_MAP, ALLOCATION_PRESETS, SCENARIO_IDS, SCENARIO_LABELS, type ScenarioId } from "../config/assets";
+import { sumOtherRetireIncome } from "../core/otherIncome";
+import { pickKnownFields } from "../core/importForm";
+import { investCompare } from "../core/investCompare";
+import { dca, dcaPair } from "../core/dca";
+import { defaultCategoryFor, type CategoryId } from "../config/categories";
 import { fmtMoney, fmtNum, fmtPct, fmtPlain, fmtRatePct, unitWord, basisTag, type Basis, type Unit } from "./format";
 import Chart, { ScenarioChart, MultiLineChart, IncomeStackChart, PurchasingPowerChart, AssetRangeBars } from "./chart";
 
@@ -25,21 +29,17 @@ interface FormState {
   monthlyIncome: string; salaryGrowth: string;
   expenses: ExpenseRow[];
   retireSpend: string; retireManual: boolean;
-  inflation: string; retPre: string; retPost: string;
+  retPre: string; retPost: string;
+  // Phase 4 其他退休收入小幫手
+  otherRent: string; otherAnnuity: string; otherPartTime: string;
   // Phase 2
   assetsEnabled: boolean;
   allocation: Record<string, string>;
   retireAllocMode: "same" | "custom";
   retireAllocation: Record<string, string>;
   fxChange: string;
-  scenarioInflation: Record<ScenarioId, string>;
   returnOverrides: Record<string, Record<ScenarioId, string>>;
   deduction: string;
-  categoryEnabled: boolean;
-  categoryInflation: Record<CategoryId, string>;
-  retireSplitEnabled: boolean;
-  retireSpendCats: Record<CategoryId, string>;
-  scenarioNeutralLinked: boolean;
   // Phase 3 勞保勞退
   socialEnabled: boolean;
   liExistingYears: string;
@@ -64,7 +64,7 @@ function defaultForm(): FormState {
     salaryGrowth: String(paramValue("salaryGrowth")),
     expenses: EXAMPLE_EXPENSES.map((e) => ({ name: e.name, amount: String(e.amount), endAge: "", category: defaultCategoryFor(e.name) })),
     retireSpend: "", retireManual: false,
-    inflation: String(paramValue("inflation")),
+    otherRent: "", otherAnnuity: "", otherPartTime: "",
     retPre: String(paramValue("retPre")),
     retPost: String(paramValue("retPost")),
     assetsEnabled: false,
@@ -72,15 +72,9 @@ function defaultForm(): FormState {
     retireAllocMode: "same",
     retireAllocation: Object.fromEntries(ASSETS.map((a) => [a.id, "0"])),
     fxChange: String(paramValue("fxChange")),
-    scenarioInflation: Object.fromEntries(SCENARIO_IDS.map((id) => [id, String(defaultScenarioInflation()[id])])) as Record<ScenarioId, string>,
     returnOverrides: Object.fromEntries(ASSETS.map((a) => [a.id, Object.fromEntries(SCENARIO_IDS.map((id) => [id, String(a.returns[id].value)])) as Record<ScenarioId, string>])),
     deduction: String(paramValue("retireReturnDeduction")),
-    categoryEnabled: false,
-    categoryInflation: { housing: "", food: "", medical: "", other: "" },
-    retireSplitEnabled: false,
-    retireSpendCats: { housing: "0", food: "0", medical: "0", other: "0" },
-    scenarioNeutralLinked: true,
-    socialEnabled: false,
+    socialEnabled: true,
     liExistingYears: "0",
     liPlannedYears: "", liPlannedManual: false,
     liAvgSalary: "", liSalaryManual: false,
@@ -108,14 +102,11 @@ function toInput(f: FormState): SimInput {
       category: e.category ?? "other",
     })),
     retireSpend,
-    inflation: num(f.inflation), retPre: num(f.retPre), retPost: num(f.retPost),
+    inflation: paramValue("inflation"), // Phase 4：通膨固定 2%，不再由使用者輸入
+    retPre: num(f.retPre), retPost: num(f.retPost),
     extraMonthlySaving: 0,
-    categoryInflation: f.categoryEnabled
-      ? Object.fromEntries(CATEGORY_IDS.map((id) => [id, f.categoryInflation[id].trim() === "" ? null : num(f.categoryInflation[id])])) as Partial<Record<CategoryId, number | null>>
-      : null,
-    retireSpendCategories: f.retireSplitEnabled
-      ? CATEGORY_IDS.map((id) => ({ category: id, monthly: num(f.retireSpendCats[id]) }))
-      : null,
+    categoryInflation: null, // Phase 4 起 UI 不使用（core 保留供日後擴充）
+    retireSpendCategories: null,
     social: f.socialEnabled
       ? {
           laborInsurance: {
@@ -162,10 +153,7 @@ function compute(inp: SimInput, f: FormState): Computed {
     retireAllocation: Object.fromEntries(Object.entries(f.retireAllocation).map(([k, v]) => [k, num(v)])),
     fxChangePct: num(f.fxChange),
     returnOverrides: Object.fromEntries(Object.entries(f.returnOverrides).map(([k, rec]) => [k, Object.fromEntries(Object.entries(rec).map(([sid, v]) => [sid, num(v)])) as Record<ScenarioId, number>])),
-    scenarioInflation: resolveScenarioInflation(
-      Object.fromEntries(SCENARIO_IDS.map((id) => [id, num(f.scenarioInflation[id])])) as Record<ScenarioId, number>,
-      f.scenarioNeutralLinked, inp.inflation
-    ),
+    scenarioInflation: defaultScenarioInflation(), // Phase 4：三情境通膨固定（2.5／2／1.5）
     deductionPct: num(f.deduction),
   };
   const scenOutcome = computeScenarios(inp, scenSettings);
@@ -179,8 +167,10 @@ function compute(inp: SimInput, f: FormState): Computed {
 }
 
 const DISCLAIMER_FULL =
-  "本網站為試算與教育工具，所有結果依據使用者輸入與假設值推算，不代表對未來報酬的預測，也不構成任何投資建議、金融商品推介或勸誘。各標的報酬率、通膨率、匯率變動、勞保勞退參數均為暫定假設值，使用者應自行查證並調整。歷史報酬不保證未來表現，投資有風險。勞保、勞退、稅務與健保規定可能變動，請以主管機關公告為準。本網站未考慮個人的完整財務狀況、風險承受度與投資目標，若需要專業意見，請洽具備資格的專業人士。";
+  "本網站為試算與教育工具，所有結果依據使用者輸入與假設值推算，不代表對未來報酬的預測，也不構成任何投資建議、金融商品推介或勸誘。各標的報酬率、通膨率、匯率變動、勞保勞退參數均為依公開資料推得的假設值（查證日 2026-11-17），使用者可自行調整。歷史報酬不保證未來表現，投資有風險。勞保、勞退、稅務與健保規定可能變動，請以主管機關公告為準。本網站未考慮個人的完整財務狀況、風險承受度與投資目標，若需要專業意見，請洽具備資格的專業人士。";
 const DISCLAIMER_SHORT = "以上為依假設值推算的試算結果，非預測，也不是投資建議。";
+const COMPLIANCE = "以下為假設值試算的教育性比較，非預測、非投資建議，也不代表任何金融商品的推介。歷史報酬不代表未來，投資有虧損風險。";
+const INFLATION_FIXED_NOTE = "通膨率固定以 2% 計算。依據：主計總處 CPI 年增率 113 年 2.18%、114 年 1.66%、115 年 1–10 月 1.98%；中央銀行表示通膨率中長期平均 2% 左右可以接受。";
 
 export default function App() {
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -226,7 +216,6 @@ export default function App() {
   const restoreRetireSpend = () => set({ retireManual: false, retireSpend: "" });
 
   const resetAssumptions = () => set({
-    inflation: String(paramValue("inflation")),
     retPre: String(paramValue("retPre")),
     retPost: String(paramValue("retPost")),
     salaryGrowth: String(paramValue("salaryGrowth")),
@@ -247,7 +236,8 @@ export default function App() {
         const data = JSON.parse(text);
         const f = data.form as FormState;
         if (!f || typeof f.ageNow !== "string" || !Array.isArray(f.expenses)) throw new Error("bad");
-        setForm({ ...defaultForm(), ...f });
+        // Phase 4：只保留目前 FormState 的欄位，舊檔的已刪除欄位直接忽略
+        setForm(pickKnownFields(f as unknown as Record<string, unknown>, defaultForm() as unknown as Record<string, unknown>) as unknown as FormState);
         setImportMsg("");
       } catch {
         setImportMsg("設定檔格式不正確，無法匯入，原來的數字沒有被改動。");
@@ -297,9 +287,23 @@ export default function App() {
                 <p className="msg">{validation.ageErrors.map((m, i) => <span key={i}>{m}<br /></span>)}</p>
                 <div className="grid2">
                   <div><label htmlFor="initAssets">目前已有可投資資產 <span className="unit-hint">（元）</span></label><input id="initAssets" type="number" inputMode="decimal" step="any" value={form.initAssets} onChange={(e) => set({ initAssets: e.target.value })} /></div>
-                  <div><label htmlFor="otherRetireIncome">其他退休收入 <span className="unit-hint">（元／月，今日幣值，選填）</span></label><input id="otherRetireIncome" type="number" inputMode="decimal" step="any" value={form.otherRetireIncome} onChange={(e) => set({ otherRetireIncome: e.target.value })} /></div>
+                  <div><label htmlFor="otherRetireIncome">其他退休收入（勞保、勞退以外） <span className="unit-hint">（元／月，今日幣值，選填）</span></label><input id="otherRetireIncome" type="number" inputMode="decimal" step="any" value={form.otherRetireIncome} onChange={(e) => set({ otherRetireIncome: e.target.value })} /></div>
                 </div>
-                <p className="note">「其他退休收入」指退休後每月固定進帳（例如租金收入），以今日幣值填寫；本階段不含勞保、勞退。</p>
+                <p className="note">退休後每個月固定會有的其他收入，例如：房租淨收入、年金險或儲蓄險每月給付、退休後兼職、公教或軍職退休金。大部分上班族填 0 即可；不確定就填 0，結果會偏保守。勞保、勞退請在「勞保與勞退」區設定，不要重複填。</p>
+                <details className="no-print">
+                  <summary style={{ cursor: "pointer", fontSize: ".92rem" }}>幫我估（把三項加總填入）</summary>
+                  <div className="grid3" style={{ marginTop: 8 }}>
+                    <div><label htmlFor="oiRent">租金淨收入 <span className="unit-hint">（元／月，扣掉稅、管理費、修繕）</span></label><input id="oiRent" type="number" inputMode="decimal" step="any" value={form.otherRent} onChange={(e) => set({ otherRent: e.target.value })} /></div>
+                    <div><label htmlFor="oiAnn">年金險每月給付 <span className="unit-hint">（元／月）</span></label><input id="oiAnn" type="number" inputMode="decimal" step="any" value={form.otherAnnuity} onChange={(e) => set({ otherAnnuity: e.target.value })} /></div>
+                    <div><label htmlFor="oiPart">退休後兼職收入 <span className="unit-hint">（元／月）</span></label><input id="oiPart" type="number" inputMode="decimal" step="any" value={form.otherPartTime} onChange={(e) => set({ otherPartTime: e.target.value })} /></div>
+                  </div>
+                  <p className="note">合計 {fmtPlain(sumOtherRetireIncome({ rentNet: num(form.otherRent), annuity: num(form.otherAnnuity), partTime: num(form.otherPartTime) }))} 元／月（負數或空白當 0）。
+                    <button type="button" className="ghost small" style={{ marginLeft: 8 }}
+                      onClick={() => set({ otherRetireIncome: String(sumOtherRetireIncome({ rentNet: num(form.otherRent), annuity: num(form.otherAnnuity), partTime: num(form.otherPartTime) })) })}>
+                      填入「其他退休收入」
+                    </button>
+                  </p>
+                </details>
                 <p className="msg">{validation.basicErrors.map((m, i) => <span key={i}>{m}<br /></span>)}</p>
               </div>
             </details>
@@ -311,6 +315,21 @@ export default function App() {
                   <div><label htmlFor="monthlyIncome">每月收入 <span className="unit-hint">（稅後實領，元）</span></label><input id="monthlyIncome" type="number" inputMode="decimal" step="any" value={form.monthlyIncome} onChange={(e) => set({ monthlyIncome: e.target.value })} /></div>
                   <div><label htmlFor="salaryGrowth">預期薪資年成長率 <span className="unit-hint">（名目，%／年）</span></label><input id="salaryGrowth" type="number" inputMode="decimal" step="any" value={form.salaryGrowth} onChange={(e) => set({ salaryGrowth: e.target.value })} /></div>
                 </div>
+                {(() => {
+                  const g = salaryRealGrowth(inp);
+                  const years = Math.max(0, inp.ageRetire - inp.ageNow);
+                  const pp = nominalToReal(inp.monthlyIncome, inp.inflation / 100, years);
+                  return (
+                    <p className="note">
+                      薪水有沒有跑贏通膨：實質薪資成長率 g ＝ {fmtRatePct(g)}／年。
+                      {g > 0
+                        ? " 薪資成長高於通膨，購買力正在增加。"
+                        : g < 0
+                          ? <> <b>購買力正在下降。</b>若薪水金額維持不變，{years} 年後同樣的薪水約可買到相當於今天的 {fmtPlain(Math.round(pp))} 元。</>
+                          : " 薪資成長與通膨相同，購買力不變。"}
+                    </p>
+                  );
+                })()}
                 <div className="expense-head" aria-hidden="true"><span>支出項目</span><span>每月金額（元）</span><span>結束年齡</span><span /></div>
                 {form.expenses.map((e, i) => (
                   <div className="expense-row" key={i}>
@@ -320,10 +339,6 @@ export default function App() {
                       onChange={(ev) => set({ expenses: form.expenses.map((x, j) => j === i ? { ...x, amount: ev.target.value } : x) })} />
                     <input type="number" className="exp-end f-end" aria-label="到第幾歲結束（選填）" inputMode="numeric" step="1" placeholder="到第幾歲結束（選填）" value={e.endAge}
                       onChange={(ev) => set({ expenses: form.expenses.map((x, j) => j === i ? { ...x, endAge: ev.target.value } : x) })} />
-                    <select className="exp-cat" aria-label="支出類別（分類通膨用）" value={e.category}
-                      onChange={(ev) => set({ expenses: form.expenses.map((x, j) => j === i ? { ...x, category: ev.target.value as CategoryId } : x) })}>
-                      {EXPENSE_CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
                     <button type="button" className="del" aria-label="刪除此支出項目"
                       onClick={() => set({ expenses: form.expenses.filter((_, j) => j !== i) })}>×</button>
                   </div>
@@ -352,126 +367,39 @@ export default function App() {
               <summary>3. 假設參數</summary>
               <div className="card-body">
                 <p className="note" style={{ marginTop: 6 }}>預設值為假設，請自行查證後調整。以下數字都是「假設值」，不是對未來的預測。</p>
-                <div className="grid3">
-                  <div><label htmlFor="inflation">通膨率 <span className="unit-hint">（%／年）</span></label><input id="inflation" type="number" inputMode="decimal" step="any" value={form.inflation} onChange={(e) => set({ inflation: e.target.value })} /></div>
-                  <div><label htmlFor="retPre">投資年化報酬率 <span className="unit-hint">（名目，%／年）</span></label><input id="retPre" type="number" inputMode="decimal" step="any" value={form.retPre} onChange={(e) => set({ retPre: e.target.value })} /></div>
+                <p className="note">{INFLATION_FIXED_NOTE}</p>
+                <div className="grid2">
+                  <div><label htmlFor="retPre">投資年化報酬率 <span className="unit-hint">（名目，%／年，大盤型 ETF 為主的組合）</span></label><input id="retPre" type="number" inputMode="decimal" step="any" value={form.retPre} onChange={(e) => set({ retPre: e.target.value })} /></div>
                   <div><label htmlFor="retPost">退休後年化報酬率 <span className="unit-hint">（名目，%／年）</span></label><input id="retPost" type="number" inputMode="decimal" step="any" value={form.retPost} onChange={(e) => set({ retPost: e.target.value })} /></div>
                 </div>
-                <p className="note">實質報酬率<span className="q" tabIndex={0} data-tip="扣掉通膨後的報酬率，算法是 (1＋名目報酬率) ÷ (1＋通膨率) − 1，不能直接用相減。">?</span>會依通膨自動換算，不需另外輸入。</p>
+                <p className="note">實質報酬率<span className="q" tabIndex={0} data-tip="扣掉通膨後的報酬率，算法是 (1＋名目報酬率) ÷ (1＋通膨率) − 1，不能直接用相減。">?</span>會依通膨（固定 2%）自動換算，不需另外輸入。</p>
                 <p className="msg">{[...validation.assumpErrors, ...validation.warnings].map((m, i) => <span key={i}>{m}<br /></span>)}</p>
                 {Number.isFinite(num(form.retPost)) && Number.isFinite(num(form.retPre)) && num(form.retPost) > num(form.retPre) && (
                   <p className="soft-hint show">目前退休後報酬假設（{form.retPost}%）高於退休前（{form.retPre}%），請確認這是你的意思。</p>
                 )}
                 <div>
                   <button type="button" className="ghost small" onClick={resetAssumptions}>還原預設值</button>
-                  <span className="note">（通膨 {paramValue("inflation")}%、投資報酬 {paramValue("retPre")}%、退休後報酬 {paramValue("retPost")}%、薪資成長 {paramValue("salaryGrowth")}%）</span>
+                  <span className="note">（投資報酬 {paramValue("retPre")}%、退休後報酬 {paramValue("retPost")}%、薪資成長 {paramValue("salaryGrowth")}%）</span>
                 </div>
               </div>
             </details>
 
             <details className="card" open>
-              <summary>4. 通膨進階（選用）</summary>
-              <div className="card-body">
-                {(() => {
-                  const g = salaryRealGrowth(inp);
-                  const years = Math.max(0, inp.ageRetire - inp.ageNow);
-                  const pp = nominalToReal(inp.monthlyIncome, inp.inflation / 100, years);
-                  return (
-                    <p className="note" style={{ marginTop: 6 }}>
-                      薪水有沒有跑贏通膨：實質薪資成長率 g ＝ {fmtRatePct(g)}／年。
-                      {g > 0
-                        ? " 薪資成長高於通膨，購買力正在增加。"
-                        : g < 0
-                          ? <> <b>購買力正在下降。</b>若薪水金額維持不變，{years} 年後同樣的薪水約可買到相當於今天的 {fmtPlain(Math.round(pp))} 元。</>
-                          : " 薪資成長與通膨相同，購買力不變。"}
-                      （情境模式下以中性情境通膨為準的顯示見結果區；此處以目前通膨輸入計算。）
-                    </p>
-                  );
-                })()}
-                <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10 }}>
-                  <input type="checkbox" checked={form.categoryEnabled} onChange={(e) => set({ categoryEnabled: e.target.checked })} />
-                  各支出類別使用不同通膨率
-                </label>
-                {form.categoryEnabled && (
-                  <>
-                    <div className="grid2" style={{ marginTop: 8 }}>
-                      {EXPENSE_CATEGORIES.map((c) => (
-                        <div key={c.id}>
-                          <label htmlFor={`catinf-${c.id}`}>{c.label}通膨率 <span className="unit-hint">（%／年，留空＝同總通膨）</span></label>
-                          <input id={`catinf-${c.id}`} type="number" inputMode="decimal" step="any" placeholder="同總通膨" value={form.categoryInflation[c.id]}
-                            onChange={(e) => set({ categoryInflation: { ...form.categoryInflation, [c.id]: e.target.value } })} />
-                        </div>
-                      ))}
-                    </div>
-                    <p className="note">醫療與保險在高齡期通膨通常較高；設定檔的建議值為 {paramValue("categoryInflationMedicalSuggested")}%，是否套用由你決定。
-                      <button type="button" className="ghost small" style={{ marginLeft: 8 }}
-                        onClick={() => set({ categoryInflation: { ...form.categoryInflation, medical: String(paramValue("categoryInflationMedicalSuggested")) } })}>
-                        套用醫療建議值 {paramValue("categoryInflationMedicalSuggested")}%
-                      </button>
-                    </p>
-                    <p className="note">每個支出項目可在第 2 區選擇所屬類別；退休支出若未拆分，視為單一類別、採用總通膨。</p>
-                  </>
-                )}
-                <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10 }}>
-                  <input type="checkbox" checked={form.retireSplitEnabled}
-                    onChange={(e) => {
-                      if (e.target.checked && !form.retireSplitEnabled) {
-                        const byCat = defaultRetireSpendByCategory(totalsByCategory(inp), paramValue("retireSpendRatio"));
-                        set({ retireSplitEnabled: true, retireSpendCats: Object.fromEntries(CATEGORY_IDS.map((id) => [id, String(byCat[id])])) as Record<CategoryId, string> });
-                      } else set({ retireSplitEnabled: e.target.checked });
-                    }} />
-                  退休支出依類別拆分（各類別分別成長）
-                </label>
-                {form.retireSplitEnabled && (
-                  <div className="grid2" style={{ marginTop: 8 }}>
-                    {EXPENSE_CATEGORIES.map((c) => (
-                      <div key={c.id}>
-                        <label htmlFor={`rsp-${c.id}`}>退休後{c.label} <span className="unit-hint">（元／月，今日幣值）</span></label>
-                        <input id={`rsp-${c.id}`} type="number" inputMode="decimal" step="any" value={form.retireSpendCats[c.id]}
-                          onChange={(e) => set({ retireSpendCats: { ...form.retireSpendCats, [c.id]: e.target.value } })} />
-                      </div>
-                    ))}
-                    <p className="note">拆分後第 2 區的「退休後每月想花多少」不再使用，改以這四類合計為準。</p>
-                  </div>
-                )}
-              </div>
-            </details>
-
-            <details className="card" open>
-              <summary>5. 標的與三種情境（選用）</summary>
+              <summary>4. 投資標的：看看長期投資大盤型 ETF 能讓你提早幾年退休（選用）</summary>
               <div className="card-body">
                 <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
                   <input type="checkbox" checked={form.assetsEnabled} onChange={(e) => set({ assetsEnabled: e.target.checked })} />
-                  啟用標的選擇（關閉時完全回到第 3 區的單一報酬率行為，不套用退休後折減）
+                  啟用後用下面的配置跑三種情境；關閉時使用第 3 區的單一報酬率
                 </label>
                 {form.assetsEnabled && (
                   <>
-                    <p className="note">各標的報酬率皆為「假設值，非預測」，來源：假設值，歷史報酬請見發行商官網。美元計價標的（VOO、QQQ、美國公債）換算成新台幣報酬時只套用一次匯率調整；新台幣計價標的不套用。組合報酬率以每年固定比例再平衡簡化。</p>
+                    <p className="note">各標的報酬率皆為「假設值，非預測」，推算邏輯與來源見設定檔（每個欄位的來源欄）與 PARAMETERS.md。提到標的名稱只作為常見例子。美元計價標的（VOO、QQQ、美國公債）換算成新台幣報酬時只套用一次匯率調整；新台幣計價標的不套用。組合報酬率以每年固定比例再平衡簡化。三種情境的通膨率固定為保守 2.5%、中性 2%、樂觀 1.5%。</p>
+                    <p className="note">{COMPLIANCE}</p>
                     <div className="grid2">
                       <div>
                         <label htmlFor="fxChange">新台幣對美元年變動率 <span className="unit-hint">（%／年）</span></label>
                         <input id="fxChange" type="number" inputMode="decimal" step="any" value={form.fxChange} onChange={(e) => set({ fxChange: e.target.value })} />
                         <p className="note">正值＝新台幣升值，美元資產換回新台幣的報酬變差；負值＝新台幣貶值，報酬變好。</p>
-                      </div>
-                      <div>
-                        <label>三情境通膨率 <span className="unit-hint">（%／年，可個別覆寫）</span></label>
-                        <div className="grid3">
-                          {SCENARIO_IDS.map((id) => (
-                            <div key={id}>
-                              <label htmlFor={`scinf-${id}`}>{SCENARIO_LABELS[id]}{id === "neutral" && form.scenarioNeutralLinked ? "（與主畫面通膨連動）" : ""}</label>
-                              <input id={`scinf-${id}`} type="number" inputMode="decimal" step="any"
-                                value={id === "neutral" && form.scenarioNeutralLinked ? form.inflation : form.scenarioInflation[id]}
-                                onChange={(e) => id === "neutral"
-                                  ? set({ scenarioInflation: { ...form.scenarioInflation, neutral: e.target.value }, scenarioNeutralLinked: false })
-                                  : set({ scenarioInflation: { ...form.scenarioInflation, [id]: e.target.value } })} />
-                            </div>
-                          ))}
-                        </div>
-                        {!form.scenarioNeutralLinked && (
-                          <p className="note">中性情境通膨已手動修改，與主畫面通膨脫鉤。
-                            <button type="button" className="ghost small" style={{ marginLeft: 8 }} onClick={() => set({ scenarioNeutralLinked: true })}>恢復與主畫面通膨連動</button>
-                          </p>
-                        )}
                       </div>
                     </div>
 
@@ -510,15 +438,15 @@ export default function App() {
                     </tbody></table>
                     {(() => {
                       const total = ASSETS.reduce((sum, a) => sum + num(form.allocation[a.id] ?? "0"), 0);
-                      const tsmcPct = num(form.allocation["tsmc"] ?? "0");
+                      const concPct = num(form.allocation["qqq"] ?? "0");
                       return (
                         <>
                           <p className="note" aria-live="polite">配置總和：{fmtPlain(Math.round(total * 10) / 10)}%{Math.abs(total - 100) >= 1e-9 ? `（還差 ${fmtPlain(Math.round((100 - total) * 10) / 10)}%，總和為 100% 前暫停計算）` : ""}</p>
-                          {tsmcPct > paramValue("concentrationWarnPct") && tsmcPct <= paramValue("concentrationStrongPct") && (
-                            <p className="soft-hint show">集中風險提醒：台積電配置已超過 {paramValue("concentrationWarnPct")}%，單一個股的風險遠高於 ETF。</p>
+                          {concPct > paramValue("concentrationWarnPct") && concPct <= paramValue("concentrationStrongPct") && (
+                            <p className="soft-hint show">集中風險提醒：QQQ 配置已超過 {paramValue("concentrationWarnPct")}%。QQQ 屬於產業集中型 ETF，配置比例高時波動會明顯放大。</p>
                           )}
-                          {tsmcPct > paramValue("concentrationStrongPct") && (
-                            <p className="soft-hint show warn-strong">集中風險提醒（明確）：台積電配置已超過 {paramValue("concentrationStrongPct")}%，這是單一個股部位，波動與公司個別風險都很高，請確認這是你的意思（不會阻止你繼續試算）。</p>
+                          {concPct > paramValue("concentrationStrongPct") && (
+                            <p className="soft-hint show warn-strong">集中風險提醒（明確）：QQQ 配置已超過 {paramValue("concentrationStrongPct")}%。QQQ 屬於產業集中型 ETF，配置比例高時波動會明顯放大，請確認這是你的意思（不會阻止你繼續試算）。</p>
                           )}
                         </>
                       );
@@ -555,12 +483,13 @@ export default function App() {
             </details>
 
             <details className="card" open>
-              <summary>6. 勞保與勞退（選用）</summary>
+              <summary>5. 勞保與勞退（選用）</summary>
               <div className="card-body">
                 <label style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
                   <input type="checkbox" checked={form.socialEnabled} onChange={(e) => set({ socialEnabled: e.target.checked })} />
                   納入勞保與勞退（關閉時不影響試算）
                 </label>
+                <p className="note">已預設納入勞保、勞退；不想納入可以取消勾選。</p>
                 {form.socialEnabled && (
                   <>
                     <p className="note">勞保、勞退制度參數已依勞動部勞工保險局、全國法規資料庫公告核對（查證日 2026-11-17）；勞退基金收益率、年金打折等為假設值。法規可能變動，請以主管機關最新公告為準。</p>
@@ -679,6 +608,7 @@ export default function App() {
             )}
             {computed && !stale && (
               <>
+                <InvestSection c={computed} basis={basis} unit={unit} />
                 <GoalsCard c={computed} form={debounced} />
                 <CompareCard c={computed} form={debounced} unit={unit} />
               </>
@@ -737,7 +667,7 @@ function Results({ c, basis, unit, setBasis, setUnit, onCsv }: {
             <div className="v">{res.required > 0 ? money(res.required, R - A) : `0 ${unitWord(unit)}${basisTag(basis)}`}</div>
             <div className="s">{res.required > 0
               ? <>資金達成率 {fmtPct(res.achieve)}<span className="q" tabIndex={0} data-tip="退休時預估資產 ÷ 退休所需資金。100% 表示剛好撐到預期壽命。">?</span></>
-              : (res.shortfall <= 0 ? "退休支出已由其他退休收入覆蓋" : "無退休年數")}</div>
+              : (res.shortfall <= 0 ? "勞保、勞退和其他退休收入已足以支應退休支出（依目前假設）" : "無退休年數")}</div>
           </div>
           <div className="sum-card">
             <div className="k">最早可退休年齡</div>
@@ -800,7 +730,7 @@ function Results({ c, basis, unit, setBasis, setUnit, onCsv }: {
           )}
 
           <p className="note" style={{ marginTop: 10 }}>{DISCLAIMER_SHORT}</p>
-          <p className="print-only">主要假設：現在年齡 {A} 歲、預計退休 {R} 歲、預期壽命 {L} 歲；通膨率假設 {inp.inflation}%、投資年化報酬率假設（名目）{inp.retPre}%、退休後年化報酬率假設（名目）{inp.retPost}%、薪資年成長率假設（名目）{inp.salaryGrowth}%。</p>
+          <p className="print-only">主要假設：現在年齡 {A} 歲、預計退休 {R} 歲、預期壽命 {L} 歲；通膨率 2%（固定假設）、投資年化報酬率假設（名目）{inp.retPre}%、退休後年化報酬率假設（名目）{inp.retPost}%、薪資年成長率假設（名目）{inp.salaryGrowth}%。</p>
         </div>
       </div>
 
@@ -859,7 +789,7 @@ function Results({ c, basis, unit, setBasis, setUnit, onCsv }: {
           <p>本頁以「年」為單位逐年往下算：年齡用整數、每一年的現金流都假設在<b>年底</b>發生。現在年齡記為 A、退休年齡 R、預期壽命 L；工作年數＝R−A，退休年數＝L−R。所有金額先以浮點數精算，顯示時才取整；每個除法在計算前都會先檢查分母。</p>
           <p><b>目前採用的參數值</b>（會隨左側輸入即時更新）：</p>
           <ul>
-            <li>通膨率假設：{inp.inflation}%／年</li>
+            <li>通膨率：2%（固定假設）</li>
             <li>投資年化報酬率假設（名目）：{inp.retPre}%／年 → 實質報酬率 <code>r</code> ＝ {fmtRatePct(res.r)}</li>
             <li>退休後年化報酬率假設（名目）：{inp.retPost}%／年 → 退休後實質報酬率 <code>rho</code> ＝ {fmtRatePct(res.rho)}</li>
             <li>薪資年成長率假設（名目）：{inp.salaryGrowth}%／年 → 實質薪資成長率 <code>g</code> ＝ {fmtRatePct(res.g)}</li>
@@ -939,7 +869,7 @@ function ScenarioResults({ c, scen, basis, unit, setBasis, setUnit }: {
           <div className="sum-card">
             <div className="k">退休所需資金（中性情境）</div>
             <div className="v">{neu.res.required > 0 ? moneyOf(neu)(neu.res.required, R - A) : `0 ${unitWord(unit)}${basisTag(basis)}`}</div>
-            <div className="s">{neu.res.required > 0 ? <>資金達成率 {fmtPct(neu.res.achieve)}</> : "退休支出已由其他退休收入覆蓋或無退休年數"}</div>
+            <div className="s">{neu.res.required > 0 ? <>資金達成率 {fmtPct(neu.res.achieve)}</> : (neu.res.shortfall <= 0 ? "勞保、勞退和其他退休收入已足以支應退休支出（依目前假設）" : "無退休年數")}</div>
           </div>
           <div className="sum-card">
             <div className="k">最早可退休年齡（中性情境）</div>
@@ -1067,7 +997,7 @@ function GoalsCard({ c, form }: { c: Computed; form: FormState }) {
         {single ? (
           <p className="note">以下答案使用與主畫面完全相同的假設（你輸入的退休前、退休後報酬率與通膨）。開啟『標的與配置』後，可看到保守、中性、樂觀三種情境的反推結果。反推與主畫面共用同一個模擬引擎。</p>
         ) : (
-          <p className="note">以下答案都是「在目前所有假設下」的試算，依第 5 區的標的與情境設定分三種情境計算。反推與主畫面共用同一個模擬引擎。</p>
+          <p className="note">以下答案都是「在目前所有假設下」的試算，依第 4 區的標的與情境設定分三種情境計算。反推與主畫面共用同一個模擬引擎。</p>
         )}
         {!single && scen.paused ? (
           <p className="range-line">請先讓配置總和為 100%（目前 {fmtPlain(Math.round(scen.allocationTotalPct * 10) / 10)}%），反推暫停計算。</p>
@@ -1206,10 +1136,140 @@ function CompareCard({ c, form, unit }: { c: Computed; form: FormState; unit: Un
                 <td>{v.exhaustAge === null ? `撐到 ${c.inp.ageLife} 歲` : `${v.exhaustAge} 歲耗盡`}</td></tr>
             ))}</tbody></table>
         ) : (
-          <p className="note">未納入勞保與勞退（第 6 區未啟用），本對照不適用。</p>
+          <p className="note">未納入勞保與勞退（第 5 區未啟用），本對照不適用。</p>
         )}
-        <p className="note">以上圖表都是依假設值推算的比較，不是預測，也不是投資建議。</p>
+        <p className="note">{COMPLIANCE}</p>
       </div>
     </div>
+  );
+}
+
+const DCA_COLORS = ["#2e7d4f", "#3366aa", "#c9a227", "#8e44ad", "#d35400", "#00838f", "#6d4c41", "#5d6d7e"];
+
+/** Phase 4 第六、七節：投資對照卡 + 常見 ETF 定期定額比較（共用同一組定期定額欄位） */
+function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Unit }) {
+  const [monthlyStr, setMonthlyStr] = useState("");
+  const [stepStr, setStepStr] = useState("");
+  const [yearsStr, setYearsStr] = useState(String(paramValue("dcaCompareYears")));
+  const inp = c.inp;
+  const monthly = monthlyStr.trim() === "" ? Math.max(0, Math.round(c.monthlyBalance)) : num(monthlyStr);
+  const stepPct = stepStr.trim() === "" ? inp.salaryGrowth : num(stepStr);
+  const years = Math.min(50, Math.max(1, Math.floor(num(yearsStr)) || paramValue("dcaCompareYears")));
+  const cashRet = ASSET_MAP["cash"].returns.neutral.value;
+  const cmp = useMemo(
+    () => investCompare({ base: inp, monthlyStart: monthly, stepPct, cashRetPct: cashRet }),
+    [inp, monthly, stepPct, cashRet]
+  );
+  const money = (v: number, t: number) => fmtMoney(v, t, inp.inflation, basis, unit);
+  const workYears = Math.max(0, inp.ageRetire - inp.ageNow);
+  const dyn = cmp.dyn;
+  const dynStatement = stepPct > 0 ? (
+    <>這個結果假設你的定期定額金額會隨薪水每年調高 {fmtPlain(stepPct)}%：第 1 年每月 {fmtPlain(dyn.aMonthly)} 元 → 第 {dyn.years} 年每月約 {fmtPlain(Math.round(dyn.lastMonthlyNominal))} 元（今日幣值約 {fmtPlain(Math.round(dyn.lastMonthlyReal))} 元）。你必須真的每年跟著加碼，才會得到這個金額；如果金額一直不變，結果會是 {fmtPlain(Math.round(dyn.fixedRetireAssetsReal))} 元（今日幣值）／{fmtPlain(Math.round(dyn.fixedRetireAssetsNominal))} 元（名目）。</>
+  ) : (
+    <>這個結果假設你每月固定投入 {fmtPlain(dyn.aMonthly)} 元，不調高。</>
+  );
+  const earliestCell = (e: number | null) => (e === null ? "無法達成" : `${e} 歲`);
+  const cellText = (cell: { retireAssets: number; earliest: number | null }) => (
+    <>{money(cell.retireAssets, workYears)}<br /><span className="unit-hint">最早 {earliestCell(cell.earliest)} 可退休</span></>
+  );
+
+  const etfRows = ASSETS.map((a) => {
+    const pair = dcaPair({ monthlyStart: monthly, stepPct, nominalReturnPct: a.returns.neutral.value, inflationPct: inp.inflation, years });
+    const cons = dca({ monthlyStart: monthly, stepPct, nominalReturnPct: a.returns.conservative.value, inflationPct: inp.inflation, years });
+    const opt = dca({ monthlyStart: monthly, stepPct, nominalReturnPct: a.returns.optimistic.value, inflationPct: inp.inflation, years });
+    return { a, pair, cons, opt };
+  });
+  const pick = (real: number, nominal: number) => (basis === "nominal" ? nominal : real);
+  const chartSeries = etfRows.map((r, i) => ({
+    label: r.a.id === "cash" ? "定存（基準）" : r.a.label,
+    color: DCA_COLORS[i % DCA_COLORS.length],
+    points: [{ age: 0, v: 0 }, ...r.pair.stepped.curve.map((pt) => ({ age: pt.t, v: pick(pt.valueReal, pt.valueNominal) }))],
+  }));
+
+  return (
+    <>
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="card-head"><h2>每月定期定額投資 vs 全部放定存</h2></div>
+        <div className="card-body">
+          <div className="grid2">
+            <div>
+              <label htmlFor="dcaMonthly">每月定期定額金額 <span className="unit-hint">（元，今日幣值）</span></label>
+              <input id="dcaMonthly" type="number" inputMode="decimal" step="any" placeholder={String(Math.max(0, Math.round(c.monthlyBalance)))} value={monthlyStr} onChange={(e) => setMonthlyStr(e.target.value)} />
+              <p className="note">留空＝使用目前每月結餘 {fmtPlain(Math.max(0, Math.round(c.monthlyBalance)))} 元。</p>
+            </div>
+            <div>
+              <label htmlFor="dcaStep">每年調高幅度 <span className="unit-hint">（%，填 0 表示金額固定不變）</span></label>
+              <input id="dcaStep" type="number" inputMode="decimal" step="any" placeholder={String(inp.salaryGrowth)} value={stepStr} onChange={(e) => setStepStr(e.target.value)} />
+              <p className="note">留空＝使用薪資成長率 {fmtPlain(inp.salaryGrowth)}%。</p>
+            </div>
+          </div>
+          <div className="table-scroll">
+            <table className="scen-table">
+              <thead><tr><th></th><th>每年加碼</th><th>固定金額</th></tr></thead>
+              <tbody>
+                <tr><th>全部放定存（{fmtPlain(cashRet)}%）</th><td>{cellText(cmp.cashStepped)}</td><td>{cellText(cmp.cashFixed)}</td></tr>
+                <tr><th>大盤型 ETF 為主的組合（第 3 區報酬率）</th><td>{cellText(cmp.marketStepped)}</td><td>{cellText(cmp.marketFixed)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="note">同樣每月投入，大盤型 ETF 組合退休時比定存多約 {fmtNum(cmp.gapAssets, "wan")} 萬元{cmp.gapYears !== null && cmp.gapYears !== 0 ? `，最早可退休年齡早 ${cmp.gapYears} 歲` : ""}（假設值試算）。</p>
+          <p className="note">越早開始差越多：如果晚 {cmp.delayYears} 年才開始投資（前 {cmp.delayYears} 年先放定存，之後才投資），退休時資產約少 {fmtNum(cmp.delayGapAssets, "wan")} 萬元。{cmp.delayIsHalf ? "（工作年數不到 10 年，這裡以晚一半年數計算。）" : ""}</p>
+          <div className="callout">{dynStatement}</div>
+          <p className="note">主畫面摘要用的是『收入 − 支出』的實際結餘，這張卡用你設定的定期定額金額，所以數字可能和上方略有不同。主畫面的模型是「每月結餘 = 收入（隨薪資成長）− 支出（今日幣值固定）」，結餘每年增加的幅度比薪資成長率快；定期定額模組則是「每月投入金額依你設定的幅度調高」，兩者口徑不同。</p>
+          <p className="note">{COMPLIANCE}</p>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="card-head"><h2>常見 ETF 每月定期定額 {years} 年試算比較</h2></div>
+        <div className="card-body">
+          <div style={{ maxWidth: 260 }}>
+            <label htmlFor="dcaYears">試算年限 <span className="unit-hint">（年，1–50）</span></label>
+            <input id="dcaYears" type="number" inputMode="numeric" step="1" value={yearsStr} onChange={(e) => setYearsStr(e.target.value)} />
+          </div>
+          <p className="note">每月金額與每年調高幅度使用上方投資對照卡的同一組欄位（每月 {fmtPlain(monthly)} 元、每年調高 {fmtPlain(stepPct)}%）。</p>
+          <div className="callout">{dynStatement}</div>
+          <p className="note">試算一律使用本站的假設報酬（推算邏輯見 PARAMETERS.md），不是各 ETF 的歷史報酬；歷史報酬欄只是參考，成立時間短的參考價值更低。</p>
+          <p className="note">{COMPLIANCE}</p>
+          <div className="table-scroll">
+            <table className="scen-table etf-table">
+              <thead><tr>
+                <th>名稱</th><th>類型</th><th>成立年份</th><th>總費用率（2025 年度）</th><th>中性假設年化報酬</th>
+                <th>累積投入本金（{basis === "nominal" ? "名目" : "今日幣值"}）</th><th>{years} 年後（每年加碼）</th><th>{years} 年後（固定金額）</th>
+                <th>保守–樂觀區間（每年加碼）</th><th>成立以來實際含息年化（參考）</th><th>風險提示</th>
+              </tr></thead>
+              <tbody>
+                {etfRows.map(({ a, pair, cons, opt }) => (
+                  <tr key={a.id}>
+                    <th>{a.id === "cash" ? "定存（基準）" : a.label}</th>
+                    <td>{a.category}</td>
+                    <td>{a.inceptionDate ? a.inceptionDate.slice(0, 4) : "—"}</td>
+                    <td>{a.expenseRatioPct !== null ? `${a.expenseRatioPct}%` : "—"}</td>
+                    <td>{fmtPlain(a.returns.neutral.value)}%</td>
+                    <td>{fmtNum(pick(pair.stepped.principalReal, pair.stepped.principalNominal), unit)}</td>
+                    <td>{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)}</td>
+                    <td>{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)}</td>
+                    <td>{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</td>
+                    <td>{a.histAnnualPct !== null && a.histYears !== null
+                      ? <>{fmtPlain(a.histAnnualPct)}%（成立 {a.histYears} 年，僅供參考）{a.histYears < 10 ? "；歷史太短，未經歷完整多空循環" : ""}{a.histExtra ? `；${a.histExtra}` : ""}</>
+                      : "—"}</td>
+                    <td className="risk-cell">{a.riskNote}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="note">金額單位：{unitWord(unit)}（{basis === "nominal" ? "名目" : "今日幣值"}）。</p>
+          <h3 style={{ margin: "14px 0 6px" }}>累積曲線（中性、每年加碼）</h3>
+          <div className="legend">
+            {chartSeries.map((s) => <span key={s.label}><i className="sw" style={{ background: s.color }} />{s.label}</span>)}
+          </div>
+          <MultiLineChart series={chartSeries} unit={unit} />
+          <h3 style={{ margin: "16px 0 6px" }}>為什麼大盤型 ETF 常被拿來定期定額</h3>
+          <p className="note">大盤型（市值型）ETF 一次買進一整個市場的大型公司，不用自己選股，成分股會定期調整，內扣費用通常也比較低。定期定額是每個月固定投入，漲的時候買到的單位少、跌的時候買到的單位多，不用猜進場時間。短期一定會遇到下跌，有時跌幅很大；長期持有、持續投入，才有機會接近長期平均報酬，但沒有任何保證，也可能虧損。高股息型和產業集中型 ETF 各有不同的風險與成本，請看表格的風險提示。</p>
+          <p className="note">{COMPLIANCE}</p>
+        </div>
+      </div>
+    </>
   );
 }

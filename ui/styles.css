@@ -100,6 +100,9 @@
       .soft-hint{ display:none; margin:10px 0 2px; padding:9px 12px; border-radius:8px; font-size:.9rem;
         background:var(--surface-2); color:var(--ink); border:1px solid var(--line); }
       .soft-hint.show{ display:block; }
+      .callout{ margin:12px 0; padding:12px 14px; border-radius:10px; font-size:1rem; line-height:1.65;
+        background:var(--shade-work); border:1.5px solid var(--accent, #2e7d4f); color:var(--ink); }
+      .etf-table td.risk-cell{ min-width:180px; font-size:.85rem; }
       button{
         font:inherit; cursor:pointer; border-radius:9px; border:1px solid var(--brand);
         background:var(--brand); color:var(--brand-ink); padding:7px 14px; font-size:.95rem;
