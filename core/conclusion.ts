@@ -24,7 +24,7 @@ export function plainConclusion(i: ConclusionInput): string {
       ? `已退休，可撐到預期壽命。目前已是退休狀態，在這組假設下，資產可撐到預期壽命 ${L} 歲。`
       : `已退休，資產不足以撐到預期壽命。目前已是退休狀態，但資產將在 ${i.earliest.exhaustAge} 歲耗盡，撐不到預期壽命 ${L} 歲。`;
   } else if (i.earliest.type === "age") {
-    const first = `照目前的存法，你最早大約 ${i.earliest.age} 歲就能退休，資產可以撐到 ${L} 歲。`;
+    const first = `照目前的存法，你最早大約 ${i.earliest.age} 歲就能退休。`;
     const second = i.res.exhaustAge === null
       ? (i.finalAssetsText
           ? `你預計 ${i.retireAge} 歲退休，到 ${L} 歲時還會剩約 ${i.finalAssetsText}。`
@@ -46,7 +46,7 @@ export function shortConclusionLine(i: ConclusionInput): string {
       ? `已退休，資產可撐到 ${L} 歲。`
       : `已退休，資產會在 ${i.earliest.exhaustAge} 歲用完。`;
   } else if (i.earliest.type === "age") {
-    s = `最早約 ${i.earliest.age} 歲可以退休，資產可撐到 ${L} 歲。`;
+    s = `最早約 ${i.earliest.age} 歲可以退休。`;
   } else {
     s = `到 ${i.cap} 歲前還不能安心退休。`;
   }
