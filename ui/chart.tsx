@@ -65,7 +65,7 @@ export default function Chart({ res, inp, basis, unit }: Props) {
       )}
       <text x={L} y={H - 4} fontSize="11" fill="var(--ink-soft)">年齡（歲）</text>
       <text x={W - Rm} y={H - 4} textAnchor="end" fontSize="11" fill="var(--ink-soft)">
-        年底資產（{unitWord(unit)}，{basis === "nominal" ? "名目" : "今日幣值"}）
+        年底資產（{unitWord(unit)}，{basis === "nominal" ? "帳面金額（含通膨）" : "今日幣值"}）
       </text>
       {inp.ageRetire > aMin && inp.ageRetire < aMax && (
         <g>
@@ -252,7 +252,7 @@ export function PurchasingPowerChart({ series, amount, unit }: {
       <path d={series.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)},${y(p.real).toFixed(1)}`).join(" ")} fill="none" stroke="#b3543f" strokeWidth={2}>
         <title>實質購買力</title>
       </path>
-      <text x={L} y={H - 8} fontSize="11" fill="#667">虛線：名目金額（不變）</text>
+      <text x={L} y={H - 8} fontSize="11" fill="#667">虛線：帳面金額（不變）</text>
       <text x={L + 190} y={H - 8} fontSize="11" fill="#b3543f">紅線：實質購買力</text>
       <text x={W - R} y={H - 8} textAnchor="end" fontSize="11" fill="#667">{maxT} 年後</text>
     </svg>
