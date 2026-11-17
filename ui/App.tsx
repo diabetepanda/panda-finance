@@ -1250,9 +1250,11 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
                     <td>{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)}</td>
                     <td>{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)}</td>
                     <td>{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</td>
-                    <td>{a.histAnnualPct !== null && a.histYears !== null
-                      ? <>{fmtRatePct(a.histAnnualPct / 100)}（成立 {a.histYears} 年，僅供參考）{a.histYears < 10 ? "；歷史太短，未經歷完整多空循環" : ""}{a.histExtra ? `；${a.histExtra}` : ""}</>
-                      : "—"}</td>
+                    <td>{a.histNote
+                      ? a.histNote
+                      : a.histAnnualPct !== null && a.histYears !== null
+                        ? <>{fmtRatePct(a.histAnnualPct / 100)}（成立 {a.histYears} 年，僅供參考）{a.histYears < 10 ? "；歷史太短，未經歷完整多空循環" : ""}{a.histExtra ? `；${a.histExtra}` : ""}</>
+                        : "—"}</td>
                     <td className="risk-cell">{a.riskNote}</td>
                   </tr>
                 ))}
