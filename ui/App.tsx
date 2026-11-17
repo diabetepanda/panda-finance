@@ -8,6 +8,7 @@ import { paramValue } from "../config/defaults";
 import type { Basis, Unit } from "./format";
 import { defaultForm, toInput, compute, num, type FormState, type Computed } from "./form";
 import StepNav from "./components/StepNav";
+import { snapshotAndOpenAll, restoreAll } from "./printDetails";
 import StepBasic from "./steps/StepBasic";
 import StepCashflow from "./steps/StepCashflow";
 import StepSocial from "./steps/StepSocial";
@@ -37,17 +38,24 @@ export default function App() {
     navRef.current?.scrollIntoView({ block: "start" });
   }, [step]);
 
-  // 列印時展開所有收合區塊（逐年明細、計算說明等），印完恢復原狀態
+  // 列印時展開所有收合區塊（逐年明細、計算說明等），印完恢復原狀態。
+  // snapshotAndOpenAll 只在尚未記錄時才記錄，避免重複觸發把已展開誤記為原狀態；
+  // matchMedia('print') 的 change 作為不觸發 beforeprint/afterprint 的瀏覽器的備援。
   useEffect(() => {
-    let saved: { el: HTMLDetailsElement; open: boolean }[] = [];
-    const before = () => {
-      saved = Array.from(document.querySelectorAll("details")).map((el) => ({ el, open: el.open }));
-      saved.forEach(({ el }) => { el.open = true; });
-    };
-    const after = () => { saved.forEach(({ el, open }) => { el.open = open; }); saved = []; };
+    let saved: boolean[] | null = null;
+    const details = () => Array.from(document.querySelectorAll("details"));
+    const before = () => { saved = snapshotAndOpenAll(details(), saved); };
+    const after = () => { saved = restoreAll(details(), saved); };
+    const mq = window.matchMedia("print");
+    const onMq = (e: MediaQueryListEvent) => { if (e.matches) before(); else after(); };
     window.addEventListener("beforeprint", before);
     window.addEventListener("afterprint", after);
-    return () => { window.removeEventListener("beforeprint", before); window.removeEventListener("afterprint", after); };
+    mq.addEventListener("change", onMq);
+    return () => {
+      window.removeEventListener("beforeprint", before);
+      window.removeEventListener("afterprint", after);
+      mq.removeEventListener("change", onMq);
+    };
   }, []);
 
   const inp = useMemo(() => toInput(debounced), [debounced]);

@@ -100,9 +100,22 @@
         input[type="number"], input[type="text"]{ font-size:16px; }
         .conclusion-line{ font-size:1.3rem; }
         .expense-row .del{ min-width:44px; min-height:44px; }
-        .etf-table td, .etf-table th{ white-space:nowrap; }
-        .etf-table td:nth-child(10), .etf-table td:nth-child(11){ white-space:normal; min-width:10em; }
-        .etf-table th:first-child{ white-space:normal; min-width:6em; }
+        .tab-btn{ min-height:44px; }
+        summary{ min-height:44px; display:flex; align-items:center; }
+        .table-scroll td, .table-scroll th{ white-space:nowrap; }
+        .table-scroll td:first-child, .table-scroll th:first-child{ white-space:normal; min-width:7em; }
+        /* 手機 ETF 改卡片式：隱藏表格、顯示卡片 */
+        .etf-table-wrap{ display:none; }
+        .etf-cards{ display:block; }
+        .etf-card{ border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:12px; background:var(--surface); }
+        .etf-card-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+        .etf-card-head h4{ margin:0; font-size:1rem; }
+        .etf-card-main{ margin-top:6px; white-space:nowrap; }
+        .etf-card-amount{ font-size:1.45rem; font-weight:700; color:var(--brand); }
+        .etf-card-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-top:8px; }
+        .etf-card-grid span{ display:block; font-size:.74rem; color:var(--ink-soft); }
+        .etf-card-grid strong{ font-size:.92rem; white-space:nowrap; }
+        .etf-risk summary{ font-weight:600; }
       }
       .card{
         background:var(--surface); border:1px solid var(--line); border-radius:14px;
@@ -254,6 +267,10 @@
       footer.disclaimer p{ margin:0; }
       .print-only{ display:none; }
       @media print{
+        .etf-cards{ display:none !important; }
+        .etf-table-wrap{ display:block !important; }
+        .etf-table{ font-size:.7rem; }
+        .etf-table td, .etf-table th{ white-space:normal; }
         .privacy-bar{ position:static; }
         .stepnav, .step-page, .no-print, .example-banner, .tablist, .save-row{ display:none !important; }
         .results-wrap.offscreen{ display:block !important; }
