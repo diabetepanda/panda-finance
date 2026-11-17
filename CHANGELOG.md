@@ -1,5 +1,11 @@
 # CHANGELOG｜變更紀錄
 
+## Phase 5.5（2026-11-17）
+- 手機：結果頁「匯出設定檔（JSON）」「列印 / 另存 PDF」（.ghost／.save-row）補上 min-height:44px；全站 button 類別已盤點（ghost small、ghost、seg、step-tab、tab-btn、howto-toggle、del、step-actions、summary、checkbox label 皆有手機 44px 規則）。step-link 的 44px 改為只在手機套用。
+- 手機 ETF 卡片：主數字行改 flex-wrap（金額與「（30 年後，每年加碼）」各自不換行、空間不夠整段折行），卡片與容器加 min-width:0／max-width:100%，不再被內容撐寬。
+- 列印 ETF 表：欄寬改為名稱 9%、類型 7%、成立 7%、費用 8%、中性 7%、本金 8%、加碼 9%、固定 9%、區間 13%、歷史 23%；第 3–9 欄數字不換行（nowrap），字級 8.5pt，表頭 word-break 改 normal，年份與百分比不再從中間斷開。
+- 計算、參數、91 項測試期望值皆未變動。
+
 ## Phase 5.4（2026-11-17）
 - 手機點擊高度：所有 ≤480px 的 min-height 規則移到 styles.css 檔尾（避免被後面的一般規則覆蓋），分段切換、小按鈕、步驟連結（inline-flex）與核取方塊 label 列在手機上一律至少 44px；核取方塊放大為 20px。
 - 手機 ETF 卡片：副數字改成兩行（固定金額一行、區間一行，數字本身不換行），不再超出卡片；tag-chip 字級改為 0.82rem，卡片內文字最小 13px。
