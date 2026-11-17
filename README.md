@@ -30,6 +30,9 @@ npm test        # Vitest，涵蓋規格案例 1–17、Phase 3.2 與 Phase 4 測
 - `ui/`：React 元件，只負責輸入與顯示，數字一律從 `core/` 取得。`App.tsx` 是外殼（狀態與步驟切換），步驟元件在 `ui/steps/`、結果頁在 `ui/results/ResultsPage.tsx`、共用小元件在 `ui/components/`（StepNav、Tabs、HowToCheck），表單型別與 toInput/compute 管線在 `ui/form.ts`。
 - `tests/`：Vitest 單元測試。
 
+## 變更紀錄
+- [CHANGELOG.md](CHANGELOG.md)：各階段變更（最新：Phase 5.3 列印表格修正、手機卡片精簡、44px 點擊高度）
+
 ## 文件
 
 - [PARAMETERS.md](PARAMETERS.md)：所有參數清單（含 Phase 4 報酬率推算邏輯與 ETF 挑選依據）
