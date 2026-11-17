@@ -1,17 +1,18 @@
-# TEST_REPORT.md｜測試報告（Phase 4，2026-11-17）
+# TEST_REPORT.md｜測試報告（Phase 5.1，2026-11-17）
 
 測試框架：Vitest。執行：`npm test`。GitHub Actions 每次部署前自動執行，沒過不部署。
 
 ## 結果總覽
 
 ```
+✓ tests/phase5.test.ts (23 tests)
 ✓ tests/phase4.test.ts (18 tests)
 ✓ tests/phase32.test.ts (7 tests)
 ✓ tests/phase3.test.ts (16 tests)
 ✓ tests/phase2.test.ts (12 tests)
 ✓ tests/phase1.test.ts (13 tests)
-Test Files  5 passed (5)
-Tests  66 passed (66)，失敗 0
+Test Files  6 passed (6)
+Tests  89 passed (89)，失敗 0
 ```
 
 ## 案例清單與狀態
@@ -80,7 +81,7 @@ Tests  66 passed (66)，失敗 0
 
 其餘既有測試無期望值變動：phase2 案例 9 讀 0050 中性 7%（不變）；phase2 情境通膨為明寫 3／2／1.5（不受預設改 2.5 影響）；resolveScenarioInflation 與類別通膨測試保留（core 函式保留）。
 
-## Phase 5 新增（tests/phase5.test.ts，22 項）
+## Phase 5／5.1（tests/phase5.test.ts，23 項）
 
 | 類別 | 內容 | 結果 |
 |---|---|---|
@@ -96,3 +97,5 @@ Tests  66 passed (66)，失敗 0
 | 驗收 D1/D2 | 實領 35,000：D1 815.8 萬、D2（稅前 38,000）821.8 萬，估算與月領數字全對 | 通過 |
 | 驗收 E | 手動模式（年資 7、帳戶 255,024）與 C 逐欄相同 | 通過 |
 | 驗收 F | 舊檔 socialEnabled true 匯入後仍是 A、false 是 B | 通過 |
+
+Phase 5.1 新增 1 項：startWorkAge 空白時 toInput 的 social 與開始工作 30 歲逐欄相同（年資 0、勞退帳戶 0），預設範例結果仍為 2,374.5 萬／0／—／45 歲。總數 89 項（66＋23）。
