@@ -324,6 +324,15 @@
         .goal-card{ padding:10px; }
         .goal-field{ max-width:none; }
         .goal-field .seg button{ min-height:44px; }
+        .goal-field label{ white-space:nowrap; }
+        .q::after{ max-width:calc(100vw - 32px); }
+        .summary-grid .sum-card:nth-child(2n) .q::after{ left:auto; right:-8px; transform:none; }
+        .summary-grid .sum-card:nth-child(2n+1) .q::after{ left:-8px; transform:none; }
+        .impact-table th, .impact-table td{ font-size:13px; padding:7px 4px; }
+        .impact-table th{ white-space:normal; }
+        .impact-table td{ white-space:nowrap; }
+        .impact-table .unit-word{ display:none; }
+        .impact-unit-note[hidden]{ display:block; }
       }
       .step-link{ display:inline-flex; align-items:center; }
       .nw{ white-space:nowrap; }
