@@ -79,3 +79,20 @@ Tests  66 passed (66)，失敗 0
 - tests/phase1.test.ts 第 23–25 行：baseInput 的 `inflation: 2, retPre: 6, retPost: 4`。
 
 其餘既有測試無期望值變動：phase2 案例 9 讀 0050 中性 7%（不變）；phase2 情境通膨為明寫 3／2／1.5（不受預設改 2.5 影響）；resolveScenarioInflation 與類別通膨測試保留（core 函式保留）。
+
+## Phase 5 新增（tests/phase5.test.ts，22 項）
+
+| 類別 | 內容 | 結果 |
+|---|---|---|
+| 估算函式 | estimateExistingYears（30,30)=0、(30,23)=7、(25,30)=0、NaN=0；wageBasis 空白/0 用實領 | 通過 |
+| 級距 | estimateInsuredSalary 50,000→45,800、35,000→36,300、38,000→38,200、20,000→29,500；estimateLrWage 50,000→50,600 等 | 通過 |
+| 勞退估算 | estimateLrBalance (7, 50,600, 6)=255,024、(6, 36,300, 6)=156,816、年資 0 為 0 | 通過 |
+| resolveSocialInput | 「沒有」→null；預設選擇與 Phase 4.1 預設 social 逐欄相同；「不確定」＝「有＋幫我估」 | 通過 |
+| migrateLegacyForm | socialEnabled true→yes＋手動、false→no、無 version 原樣通過、endAge 支出自動開開關 | 通過 |
+| plainConclusion | 有最早年齡（兩句）、無法達成、已退休三種句型 | 通過 |
+| 驗收 A | 預設範例：2,374.5 萬／0／—／45 歲／85 歲剩 3,853.9 萬；勞保 35 年月領 24,847；勞退帳戶 1,387,341 | 通過 |
+| 驗收 B | 「沒有」：2,235.8 萬／422.9 萬／528.7%／48 歲／剩 2,942.4 萬 | 通過 |
+| 驗收 C | 23 歲開始、稅前 50,000：估算 7 年／45,800／50,600／255,024；2,400.0 萬／44 歲／勞保 42 年月領 29,816／勞退 1,642,365；稅前空白相同 | 通過 |
+| 驗收 D1/D2 | 實領 35,000：D1 815.8 萬、D2（稅前 38,000）821.8 萬，估算與月領數字全對 | 通過 |
+| 驗收 E | 手動模式（年資 7、帳戶 255,024）與 C 逐欄相同 | 通過 |
+| 驗收 F | 舊檔 socialEnabled true 匯入後仍是 A、false 是 B | 通過 |

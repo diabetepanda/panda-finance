@@ -147,3 +147,28 @@
 - 晚開始對照：delayYears = 工作年數 ≥ 10 時 10 年，否則一半（無條件捨去、至少 1 年並註明）；以 cashYearsAtStart 讓前 delayYears 年放定存。
 - 動態說明數字：以 dca（年限 = 工作年數、報酬 = base.retPre）算 A、B（名目）、B′（今日幣值）；C = 大盤固定金額組的退休時資產（今日幣值與名目，名目以 (1+通膨)^工作年數 換算）。
 - 口徑差異：主畫面用「收入 − 支出」實際結餘，本模組用設定的定期定額金額，數字不會與主畫面摘要完全相同（網頁已以一般文字說明）。
+
+## Phase 5 新增（2026-11-17）
+
+### core/socialEstimate.ts
+
+- `estimateExistingYears(ageNow, startWorkAge)` = max(0, ageNow − startWorkAge)；startWorkAge 非有限數字回傳 0。
+- `wageBasis(grossSalary, monthlyIncome)`：grossSalary 為有限且 > 0 時用它，否則用 monthlyIncome。
+- `estimateInsuredSalary(wage)` = bracketFor(wage, LI_SALARY_BRACKETS, liSalaryCap)；`estimateLrWage(wage)` = bracketFor(wage, LR_WAGE_BRACKETS, lrWageCap)。
+- `estimateLrBalance(years, lrWage, employerRatePct)` = years × 12 × lrWage × employerRatePct ÷ 100（不計收益）；任一值 ≤ 0 回傳 0。
+- `resolveSocialInput(choice)`：laborInsured = "no" → null；"unsure" 或 "yes"＋估算模式 → 年資/投保薪資/勞退帳戶用估算值；"yes"＋手動模式 → 用手填欄位（投保薪資未手動時仍用 wageBasis 對級距）。兩種模式共用：plannedYears（手動覆寫或 null 自動）、claimAge、discountPct、indexed、勞退提繳薪資（覆寫或 wageBasis 對級距）、employerRatePct、employeeRatePct、fundReturnPct、mode、勞退 claimAge。UI 的 toInput 只呼叫本函式。
+- `validateSocialChoice(...)`：開始工作年齡 > 現在年齡或 < 15、稅前月薪為負數時回傳提示文字，只提示不阻擋計算。
+
+### core/importForm.ts `migrateLegacyForm(raw)`（pickKnownFields 之前執行）
+
+- 有 socialEnabled 且沒有 laborInsured：true → laborInsured "yes"、socialInputMode "manual"（舊檔數字原樣保留）；false → laborInsured "no"；轉換後刪除 socialEnabled。
+- 任一筆支出 endAge 非空 → showExpenseEndAge = true。
+- 匯出 JSON version 改為 2；version 1 與無 version 的檔都可匯入。
+
+### core/conclusion.ts `plainConclusion(...)` / `shortConclusionLine(...)`
+
+- 輸入：earliest、res、retireAge、lifeExpectancy、cap、scenario（可選）。
+- 有最早年齡：「照目前的存法，你最早大約 {age} 歲就能退休，資產可以撐到 {L} 歲。」＋依計畫退休年齡的結果接「你預計 {R} 歲退休，資產可以撐到 {L} 歲。」或「你預計 {R} 歲退休，資產會在 {X} 歲用完。」
+- 無法達成：「照目前的存法，到 {cap} 歲前都還不能安心退休。可以到下方『怎麼改善』看看要多存多少。」
+- 已退休：「你已屆退休年齡，資產可撐到 {L} 歲。」或「你已屆退休年齡，資產會在 {X} 歲用完。」
+- scenario 為 true 時句尾加「（中性情境）」。shortConclusionLine 是步驟頁「目前試算」小字的短版句型。
