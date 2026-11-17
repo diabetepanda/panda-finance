@@ -92,8 +92,8 @@
 | 0056 | 台股高股息 | 2007-12-13 | 0.57% | 10.21% | 2026-11-16 | 19 | MoneyDJ ETF 基本資料「總管理費用」欄（2025 年度）https://www.moneydj.com/etf/x/basic/basic0004.xdjhtm?etfid=0056.tw | MoneyDJ「成立以來年化報酬排行」（截至 2026-11-16，含息）https://www.moneydj.com/etf/x/rank/rank0007.xdjhtm?eord=t800652&erank=irr&etab=2&earea=47 |
 | 00878 | 台股高股息 | 2020-07-10 | 0.53% | 20.64% | 2026-11-16 | 6 | MoneyDJ ETF 基本資料「總管理費用」欄（2025 年度）https://www.moneydj.com/etf/x/basic/basic0004.xdjhtm?etfid=00878.tw | MoneyDJ「成立以來年化報酬排行」（截至 2026-11-16，含息）https://www.moneydj.com/etf/x/rank/rank0007.xdjhtm?eord=t800652&erank=irr&etab=2&earea=47 |
 | 00919 | 台股高股息 | 2022-10-13 | 0.69% | 31.15% | 2026-11-16 | 4 | MoneyDJ ETF 基本資料「總管理費用」欄（2025 年度）https://www.moneydj.com/etf/x/basic/basic0004.xdjhtm?etfid=00919.tw | MoneyDJ「成立以來年化報酬排行」（截至 2026-11-16，含息）https://www.moneydj.com/etf/x/rank/rank0007.xdjhtm?eord=t800652&erank=irr&etab=2&earea=47 |
-| QQQ | 美股科技（產業集中） | 1999-03-10 | 0.18% | 10.88% | 2026-09-30 | 27 | Invesco QQQ 官網 https://www.invesco.com/qqq-etf/en/home.html | Invesco QQQ 官網 fact sheet（成立以來 NAV 年化，截至 2026-09-30）https://www.invesco.com/qqq-etf/en/home.html |
-| 美國公債 | 債券 | — | — | 4.5% | 1928–2025 | 98 | — | Damodaran Historical Returns（美國 10 年期公債 1928–2025 年化約 4.5%）https://pages.stern.nyu.edu/adamodar/New_Home_Page/datafile/histretSP.html |
+| QQQ | 美股科技（產業集中） | 1999-03-10 | 0.18% | 10.88% | 2026-09-30 | 28 | Invesco QQQ 官網 https://www.invesco.com/qqq-etf/en/home.html | Invesco QQQ 官網 fact sheet（成立以來 NAV 年化，截至 2026-09-30）https://www.invesco.com/qqq-etf/en/home.html |
+| 美國公債 | 債券 | — | — | 4.5% | 1928–2025 | —（資料期間，非成立年數） | — | Damodaran Historical Returns（美國 10 年期公債 1928–2025 年化約 4.5%）https://pages.stern.nyu.edu/adamodar/New_Home_Page/datafile/histretSP.html |
 | 定存 / 現金 | 現金 | — | — | — | — | — | — | — |
 
 範例支出項目 EXAMPLE_EXPENSES（房租或房貸 12,000、伙食 9,000、交通 2,000、水電網路 2,000、保險 2,000、娛樂 2,000、其他 1,000，合計 30,000 元/月）：source 為「範例值（使用者應改成自己的數字）」，updatedAt 2026-11-17。
