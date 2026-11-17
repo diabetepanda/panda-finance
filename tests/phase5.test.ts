@@ -100,9 +100,9 @@ describe("第六節｜plainConclusion", () => {
   it("有最早年齡：兩句都在", () => {
     const inp: SimInput = { ...base, retPre: paramValue("retPre"), retPost: paramValue("retPost"), social: resolveSocialInput(defaultChoice()) };
     const { res, earliest } = computePhase1(inp);
-    const s = plainConclusion({ earliest, res, retireAge: 65, lifeExpectancy: 85, cap: paramValue("earliestRetirementCap") });
+    const s = plainConclusion({ earliest, res, retireAge: 65, lifeExpectancy: 85, cap: paramValue("earliestRetirementCap"), finalAssetsText: "3,853.9 萬元（今日幣值）" });
     expect(s).toContain("你最早大約 45 歲就能退休");
-    expect(s).toContain("你預計 65 歲退休，資產可以撐到 85 歲。");
+    expect(s).toContain("你預計 65 歲退休，到 85 歲時還會剩約 3,853.9 萬元（今日幣值）。");
     expect(shortConclusionLine({ earliest, res, retireAge: 65, lifeExpectancy: 85, cap: 75 })).toContain("最早約 45 歲可以退休");
   });
   it("無法達成", () => {
@@ -117,7 +117,7 @@ describe("第六節｜plainConclusion", () => {
     const inp: SimInput = { ...base, ageNow: 65, ageRetire: 65, social: null };
     const { res, earliest } = computePhase1(inp);
     expect(earliest.type).toBe("already");
-    expect(plainConclusion({ earliest, res, retireAge: 65, lifeExpectancy: 85, cap: 75 })).toContain("已屆退休年齡");
+    expect(plainConclusion({ earliest, res, retireAge: 65, lifeExpectancy: 85, cap: 75 })).toContain("已退休，資產不足以撐到預期壽命");
   });
 });
 
@@ -218,5 +218,21 @@ describe("第十節｜驗收數字 A–F", () => {
     expect(earliest).toMatchObject({ type: "age", age: 45 });
     const legacy2 = migrateLegacyForm({ socialEnabled: false });
     expect(resolveSocialInput(defaultChoice({ laborInsured: legacy2.laborInsured as "no" }))).toBeNull();
+  });
+});
+
+describe("Phase 5.1｜startWorkAge 空白 bug", () => {
+  it("空白時 toInput 的 social 與開始工作 30 歲逐欄相同，結果仍是 A", async () => {
+    const { defaultForm, toInput } = await import("../ui/form");
+    const blank = { ...defaultForm(), startWorkAge: "" };
+    const thirty = { ...defaultForm(), startWorkAge: "30" };
+    expect(toInput(blank).social).toEqual(toInput(thirty).social);
+    expect(toInput(blank).social?.laborInsurance.existingYears).toBe(0);
+    expect(toInput(blank).social?.laborPension.currentBalance).toBe(0);
+    const inp = { ...toInput(blank), retPre: paramValue("retPre"), retPost: paramValue("retPost") };
+    const { res, earliest } = computePhase1(inp);
+    expect(Math.round(res.retireAssets / 1000) / 10).toBe(2374.5);
+    expect(res.required).toBe(0);
+    expect(earliest).toMatchObject({ type: "age", age: 45 });
   });
 });
