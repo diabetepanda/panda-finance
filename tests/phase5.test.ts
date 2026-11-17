@@ -103,7 +103,7 @@ describe("第六節｜plainConclusion", () => {
     const s = plainConclusion({ earliest, res, retireAge: 65, lifeExpectancy: 85, cap: paramValue("earliestRetirementCap"), finalAssetsText: "3,853.9 萬元（今日幣值）" });
     expect(s).toContain("你最早大約 45 歲就能退休");
     expect(s).toContain("你預計 65 歲退休，到 85 歲時還會剩約 3,853.9 萬元（今日幣值）。");
-    expect(shortConclusionLine({ earliest, res, retireAge: 65, lifeExpectancy: 85, cap: 75 })).toContain("最早約 45 歲可以退休");
+    expect(shortConclusionLine({ earliest, res, retireAge: 65, lifeExpectancy: 85, cap: 75 })).toBe("最早約 45 歲可以退休。");
   });
   it("無法達成", () => {
     const inp: SimInput = { ...base, monthlyIncome: 20000, social: null };
@@ -234,5 +234,24 @@ describe("Phase 5.1｜startWorkAge 空白 bug", () => {
     expect(Math.round(res.retireAssets / 1000) / 10).toBe(2374.5);
     expect(res.required).toBe(0);
     expect(earliest).toMatchObject({ type: "age", age: 45 });
+  });
+});
+
+describe("Phase 5.2｜列印 details 展開/恢復", () => {
+  it("連續兩次 beforeprint 後 afterprint：原本收合的恢復收合、原本展開的維持展開", async () => {
+    const { snapshotAndOpenAll, restoreAll } = await import("../ui/printDetails");
+    const items = [{ open: false }, { open: true }, { open: false }];
+    let saved: boolean[] | null = null;
+    saved = snapshotAndOpenAll(items, saved); // 第一次 beforeprint
+    expect(items.every((i) => i.open)).toBe(true);
+    saved = snapshotAndOpenAll(items, saved); // 第二次 beforeprint（不得覆寫原狀態）
+    saved = restoreAll(items, saved); // afterprint
+    expect(items.map((i) => i.open)).toEqual([false, true, false]);
+  });
+  it("沒有記錄時 restore 不改變狀態", async () => {
+    const { restoreAll } = await import("../ui/printDetails");
+    const items = [{ open: false }];
+    expect(restoreAll(items, null)).toBeNull();
+    expect(items[0].open).toBe(false);
   });
 });
