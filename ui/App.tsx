@@ -7,7 +7,7 @@ import { defaultRetireSpend, defaultRetireSpendByCategory } from "../core/retire
 import { findExtraSavingForEarliest, type ExtraSavingSolution } from "../core/solver";
 import { validateInput } from "../core/validate";
 import { computePhase1, computeScenarios, monthlyTotals, salaryRealGrowth, totalsByCategory, defaultScenarioInflation, resolveScenarioInflation, type ScenariosOutcome, type ScenarioOutcome } from "../core/compute";
-import type { SocialInput } from "../core/social";
+import { laborPensionMonthlyEligibilityWarning, type SocialInput } from "../core/social";
 import { socialParamValue, bracketFor, LI_SALARY_BRACKETS, LR_WAGE_BRACKETS } from "../config/social";
 import { goalSavingAnswers, goalSpendAnswers, goalEarliestAnswers } from "../core/goals";
 import { assetComparison, purchasingPowerSeries, socialVariants } from "../core/compare";
@@ -446,7 +446,7 @@ export default function App() {
                 </label>
                 {form.assetsEnabled && (
                   <>
-                    <p className="note">各標的報酬率皆為「假設值，非預測」，來源：待查證。美元計價標的（VOO、QQQ、美國公債）換算成新台幣報酬時只套用一次匯率調整；新台幣計價標的不套用。組合報酬率以每年固定比例再平衡簡化。</p>
+                    <p className="note">各標的報酬率皆為「假設值，非預測」，來源：假設值，歷史報酬請見發行商官網。美元計價標的（VOO、QQQ、美國公債）換算成新台幣報酬時只套用一次匯率調整；新台幣計價標的不套用。組合報酬率以每年固定比例再平衡簡化。</p>
                     <div className="grid2">
                       <div>
                         <label htmlFor="fxChange">新台幣對美元年變動率 <span className="unit-hint">（%／年）</span></label>
@@ -563,7 +563,7 @@ export default function App() {
                 </label>
                 {form.socialEnabled && (
                   <>
-                    <p className="note">以下都是目前採用的假設參數（待查證），不是官方規定；請以勞動部勞工保險局、勞動基金運用局最新公告為準。</p>
+                    <p className="note">勞保、勞退制度參數已依勞動部勞工保險局、全國法規資料庫公告核對（查證日 2026-11-17）；勞退基金收益率、年金打折等為假設值。法規可能變動，請以主管機關最新公告為準。</p>
                     <p className="note"><b>月收入請填扣掉勞退自提之後的實領金額</b>，自提部分會另外算進勞退帳戶，不會再從收入扣一次。</p>
                     <h3 style={{ margin: "12px 0 6px" }}>勞保老年年金</h3>
                     <div className="grid3">
@@ -632,6 +632,9 @@ export default function App() {
                         </div>
                       </div>
                     </div>
+                    {inp.social && laborPensionMonthlyEligibilityWarning(inp.social.laborPension, inp.ageNow, num(form.ageRetire)) && (
+                      <p className="note">勞退提繳年資未滿 15 年，依規定只能一次領，以下月領金額僅供參考。（年資以現在到退休的年數近似，實際以勞保局紀錄為準。）</p>
+                    )}
                     {inp.social && num(form.ageRetire) < num(form.lrClaimAge) && (
                       <p className="note">勞退個人帳戶通常需到法定年齡才能請領，退休到請領之間的支出會由你的資產支應。</p>
                     )}
