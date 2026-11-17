@@ -114,7 +114,7 @@ export function solveEarliestWithSaving(inp: SimInput, monthlySavingZ: number): 
 
 // ---- UI 入口（介面實際使用的計算管線） ----
 // 標的未啟用時：反推只用與主畫面完全相同的假設（主畫面 inp）給一個答案，
-// 不得改用第 5 區保留的配置/情境（那會與主畫面報酬率對不起來，且偏樂觀）。
+// 不得改用進階設定中投資標的保留的配置/情境（那會與主畫面報酬率對不起來，且偏樂觀）。
 // 標的啟用時：維持三種情境各給一個答案。
 export interface GoalRow { key: string; inp: SimInput }
 
