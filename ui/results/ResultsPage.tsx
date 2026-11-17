@@ -635,6 +635,9 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
               </tbody>
             </table>
           </div>
+          <div className="print-only">
+            <p className="note">註（風險提示全文）：{etfRows.map(({ a }) => `${a.id === "cash" ? "定存（基準）" : a.label}：${a.riskNote}`).join("；")}</p>
+          </div>
           <div className="etf-cards" role="list">
             {etfRows.map(({ a, pair, cons, opt }) => (
               <article className="etf-card" role="listitem" key={a.id}>
@@ -646,15 +649,17 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
                   <span className="etf-card-amount">{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)} {unitWord(unit)}</span>
                   <span className="unit-hint">（{years} 年後，每年加碼）</span>
                 </div>
-                <p className="note">固定金額：{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)} {unitWord(unit)}</p>
-                <div className="etf-card-grid">
-                  <div><span>中性假設年化報酬</span><strong>{fmtRatePct(a.returns.neutral.value / 100)}</strong></div>
-                  <div><span>保守–樂觀區間（每年加碼）</span><strong>{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</strong></div>
-                  <div><span>總費用率</span><strong>{a.expenseRatioPct !== null ? `${a.expenseRatioPct}%` : "—"}</strong></div>
-                  <div><span>累積投入本金</span><strong>{fmtNum(pick(pair.stepped.principalReal, pair.stepped.principalNominal), unit)} {unitWord(unit)}</strong></div>
-                </div>
-                <p className="note">成立以來實際含息年化（參考）：{histText(a)}</p>
-                <details className="etf-risk"><summary>風險提示</summary><p className="note">{a.riskNote}</p></details>
+                <p className="etf-card-sub">固定金額：{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)} {unitWord(unit)} ・ 區間 {fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)} {unitWord(unit)}</p>
+                <details className="etf-more">
+                  <summary>更多資訊</summary>
+                  <div className="etf-card-grid">
+                    <div><span>中性假設年化報酬</span><strong>{fmtRatePct(a.returns.neutral.value / 100)}</strong></div>
+                    <div><span>總費用率</span><strong>{a.expenseRatioPct !== null ? `${a.expenseRatioPct}%` : "—"}</strong></div>
+                    <div><span>累積投入本金</span><strong>{fmtNum(pick(pair.stepped.principalReal, pair.stepped.principalNominal), unit)} {unitWord(unit)}</strong></div>
+                  </div>
+                  <p className="note">成立以來實際含息年化（參考）：{histText(a)}</p>
+                  <p className="note">風險提示：{a.riskNote}</p>
+                </details>
               </article>
             ))}
           </div>
