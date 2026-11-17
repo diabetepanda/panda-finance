@@ -11,7 +11,9 @@ export function defaultFormInput(): SimInput {
     monthlyIncome: paramValue("monthlyIncome"), salaryGrowth: paramValue("salaryGrowth"),
     expenses: EXAMPLE_EXPENSES.map((e) => ({ name: e.name, amount: e.amount, endAge: null, category: defaultCategoryFor(e.name) })),
     retireSpend: Math.round(totalExp * (paramValue("retireSpendRatio") / 100)),
-    inflation: paramValue("inflation"), retPre: paramValue("retPre"), retPost: paramValue("retPost"),
+    // Phase 4 測試輸入固定化：明寫 Phase 1 規格範例值，不讀 paramValue（預設已改為 6.5／4.5）
+    inflation: 2, retPre: 6, retPost: 4,
     extraMonthlySaving: 0,
+    social: null, // Phase 1 範例口徑：不含勞保勞退
   };
 }

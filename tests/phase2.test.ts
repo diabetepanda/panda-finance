@@ -90,7 +90,7 @@ describe("案例 10｜關閉標的選擇與 Phase 1 完全一致（回歸）", (
   });
 });
 
-describe("案例 16｜分類通膨", () => {
+describe("案例 16｜類別通膨（core 保留函式）", () => {
   const base: SimInput = {
     ageNow: 30, ageRetire: 65, ageLife: 85,
     initAssets: 0, otherRetireIncome: 0,

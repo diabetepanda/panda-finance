@@ -20,9 +20,9 @@ function baseInput(overrides: Partial<SimInput> = {}): SimInput {
     expenses: [],
     retireSpend: 22500,
     otherRetireIncome: 0,
-    inflation: paramValue("inflation"),
-    retPre: paramValue("retPre"),
-    retPost: paramValue("retPost"),
+    inflation: 2, // Phase 4 測試輸入固定化：Phase 1 規格範例值（不再讀 paramValue）
+    retPre: 6,
+    retPost: 4,
     extraMonthlySaving: 0,
     ...overrides,
   };
