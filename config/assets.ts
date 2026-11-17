@@ -43,6 +43,7 @@ export interface AssetDef {
   histYears: number | null; // 成立年數（整數）
   histSource: string;
   histExtra: string | null; // 指數層級的補充參考
+  histNote: string | null; // 設定時，ETF 比較表的歷史欄改顯示這句（用於非 ETF 的長期歷史資料）
 }
 
 interface AssetSpec {
@@ -50,7 +51,7 @@ interface AssetSpec {
   dividendReinvested: boolean; riskNote: string;
   cons: number; neu: number; opt: number; returnSource: string;
   inceptionDate: string | null; expenseRatioPct: number | null; expenseSource: string;
-  histAnnualPct: number | null; histAsOf: string | null; histYears: number | null; histSource: string; histExtra: string | null;
+  histAnnualPct: number | null; histAsOf: string | null; histYears: number | null; histSource: string; histExtra: string | null; histNote?: string | null;
 }
 
 function asset(s: AssetSpec): AssetDef {
@@ -60,7 +61,7 @@ function asset(s: AssetSpec): AssetDef {
     dividendReinvested: s.dividendReinvested, riskNote: s.riskNote,
     returns: { conservative: mk("conservative", "保守", s.cons), neutral: mk("neutral", "中性", s.neu), optimistic: mk("optimistic", "樂觀", s.opt) },
     inceptionDate: s.inceptionDate, expenseRatioPct: s.expenseRatioPct, expenseSource: s.expenseSource,
-    histAnnualPct: s.histAnnualPct, histAsOf: s.histAsOf, histYears: s.histYears, histSource: s.histSource, histExtra: s.histExtra,
+    histAnnualPct: s.histAnnualPct, histAsOf: s.histAsOf, histYears: s.histYears, histSource: s.histSource, histExtra: s.histExtra, histNote: s.histNote ?? null,
   };
 }
 
@@ -115,7 +116,7 @@ export const ASSETS: AssetDef[] = [
     cons: 3, neu: 7.5, opt: 11,
     returnSource: `假設值（非預測），依 Phase 4 推算邏輯：產業集中型，中性只比大盤略高 0.5 個百分點。成立以來 10.88% 包含 2000 年科技泡沫，期間最大跌幅約八成，所以保守值放低、區間放寬。Invesco QQQ 官網 https://www.invesco.com/qqq-etf/en/home.html`,
     inceptionDate: "1999-03-10", expenseRatioPct: 0.18, expenseSource: "Invesco QQQ 官網 https://www.invesco.com/qqq-etf/en/home.html",
-    histAnnualPct: 10.88, histAsOf: "2026-09-30", histYears: 27, histSource: "Invesco QQQ 官網 fact sheet（成立以來 NAV 年化，截至 2026-09-30）https://www.invesco.com/qqq-etf/en/home.html",
+    histAnnualPct: 10.88, histAsOf: "2026-09-30", histYears: 28, histSource: "Invesco QQQ 官網 fact sheet（成立以來 NAV 年化，截至 2026-09-30）https://www.invesco.com/qqq-etf/en/home.html",
     histExtra: "追蹤的 Nasdaq-100 指數 1999 年起約 11.11%",
   }),
   asset({
@@ -125,6 +126,7 @@ export const ASSETS: AssetDef[] = [
     returnSource: `假設值（非預測），依 Phase 4 推算邏輯：目前美國 10 年期公債殖利率 5.12%（2026-11-16，美國財政部 https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202611?_format=csv&field_tdr_date_value_month=202611&page=&type=daily_treasury_yield_curve ），J.P. Morgan 美國中期公債 4.0%；取中間略保守。${FWD}`,
     inceptionDate: null, expenseRatioPct: null, expenseSource: "",
     histAnnualPct: 4.5, histAsOf: "1928–2025", histYears: 98, histSource: "Damodaran Historical Returns（美國 10 年期公債 1928–2025 年化約 4.5%）https://pages.stern.nyu.edu/adamodar/New_Home_Page/datafile/histretSP.html", histExtra: null,
+    histNote: "長期歷史約 4.5%（美國 10 年期公債 1928–2025，Damodaran 資料，僅供參考）",
   }),
   asset({
     id: "cash", label: "定存 / 現金", assetClass: "現金（對照基準）", category: "現金", currency: "TWD", dividendReinvested: false,
