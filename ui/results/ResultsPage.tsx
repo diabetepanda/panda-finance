@@ -627,7 +627,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
                     <td>{fmtNum(pick(pair.stepped.principalReal, pair.stepped.principalNominal), unit)}</td>
                     <td>{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)}</td>
                     <td>{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)}</td>
-                    <td>{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</td>
+                    <td><span className="nw">{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)}</span> – <span className="nw">{fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</span></td>
                     <td>{histText(a)}</td>
                     <td className="risk-cell">{a.riskNote}</td>
                   </tr>
@@ -636,7 +636,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
             </table>
           </div>
           <div className="print-only">
-            <p className="note">註（風險提示全文）：{etfRows.map(({ a }) => `${a.id === "cash" ? "定存（基準）" : a.label}：${a.riskNote}`).join("；")}</p>
+            <p className="note">註（風險提示全文）：{etfRows.map(({ a }) => `${a.id === "cash" ? "定存（基準）" : a.label}：${a.riskNote.replace(/。$/, "")}`).join("；")}。</p>
           </div>
           <div className="etf-cards" role="list">
             {etfRows.map(({ a, pair, cons, opt }) => (
@@ -649,7 +649,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
                   <span className="etf-card-amount">{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)} {unitWord(unit)}</span>
                   <span className="unit-hint">（{years} 年後，每年加碼）</span>
                 </div>
-                <p className="etf-card-sub">固定金額：{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)} {unitWord(unit)} ・ 區間 {fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)} {unitWord(unit)}</p>
+                <p className="etf-card-sub"><span className="nw">固定金額：{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)} {unitWord(unit)}</span><br /><span className="nw">區間 {fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)} {unitWord(unit)}</span></p>
                 <details className="etf-more">
                   <summary>更多資訊</summary>
                   <div className="etf-card-grid">
@@ -670,7 +670,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
           </div>
           <MultiLineChart series={chartSeries} unit={unit} />
           <h3 style={{ margin: "16px 0 6px" }}>為什麼大盤型 ETF 常被拿來定期定額</h3>
-          <p className="note">大盤型（市值型）ETF 一次買進一整個市場的大型公司，不用自己選股，成分股會定期調整，內扣費用通常也比較低。定期定額是每個月固定投入，漲的時候買到的單位少、跌的時候買到的單位多，不用猜進場時間。短期一定會遇到下跌，有時跌幅很大；長期持有、持續投入，才有機會接近長期平均報酬，但沒有任何保證，也可能虧損。高股息型和產業集中型 ETF 各有不同的風險與成本，請看表格的風險提示。</p>
+          <p className="note">大盤型（市值型）ETF 一次買進一整個市場的大型公司，不用自己選股，成分股會定期調整，內扣費用通常也比較低。定期定額是每個月固定投入，漲的時候買到的單位少、跌的時候買到的單位多，不用猜進場時間。短期一定會遇到下跌，有時跌幅很大；長期持有、持續投入，才有機會接近長期平均報酬，但沒有任何保證，也可能虧損。高股息型和產業集中型 ETF 各有不同的風險與成本，請看各檔的風險提示（列印版在表格下方）。</p>
           <p className="note">{COMPLIANCE}</p>
         </div>
       </div>
@@ -956,7 +956,7 @@ export default function ResultsPage(p: ResultsPageProps) {
           <h3 className="tab-print-title">進階設定</h3>
           <ReturnsCard form={p.formLive} set={p.set} validation={p.validation} onResetAssumptions={p.onResetAssumptions} />
           <AssetsCard form={p.formLive} set={p.set} />
-          <p className="note" style={{ marginTop: 12 }}>預期壽命在<button type="button" className="linklike" onClick={() => p.onGoStep(1)}>步驟 ① 關於你</button>、薪資調幅在<button type="button" className="linklike" onClick={() => p.onGoStep(2)}>步驟 ② 每個月的錢</button>、勞保勞退的細項在<button type="button" className="linklike" onClick={() => p.onGoStep(3)}>步驟 ③ 勞保勞退與其他收入</button>的『進階』裡。</p>
+          <p className="note" style={{ marginTop: 12 }}>預期壽命在<button type="button" className="linklike step-link" onClick={() => p.onGoStep(1)}>步驟 ① 關於你</button>、薪資調幅在<button type="button" className="linklike step-link" onClick={() => p.onGoStep(2)}>步驟 ② 每個月的錢</button>、勞保勞退的細項在<button type="button" className="linklike step-link" onClick={() => p.onGoStep(3)}>步驟 ③ 勞保勞退與其他收入</button>的『進階』裡。</p>
         </div>
         <div className={panelCls("details")} role="tabpanel" id="panel-details" aria-labelledby="tab-details">
           <h3 className="tab-print-title">明細與說明</h3>
