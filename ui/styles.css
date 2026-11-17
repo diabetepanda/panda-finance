@@ -248,7 +248,14 @@
         .etf-table td:nth-child(3), .etf-table td:nth-child(4), .etf-table td:nth-child(5),
         .etf-table td:nth-child(6), .etf-table td:nth-child(7), .etf-table td:nth-child(8){ white-space:nowrap; word-break:normal; }
         .etf-table td:nth-child(9){ white-space:normal; word-break:normal; }
-        .etf-table th{ font-size:7.5pt; }
+        .etf-table thead th{ font-size:7.5pt; }
+        .etf-table tbody th{ font-weight:700; }
+        .print-br{ display:inline; }
+        .chart-block{ break-inside:avoid; page-break-inside:avoid; }
+        .chart-block h3{ break-after:avoid; }
+        .chart-wrap{ break-inside:avoid; page-break-inside:avoid; }
+        h2, h3{ break-after:avoid; }
+        thead{ display:table-header-group; }
         .etf-table th:nth-child(11), .etf-table td:nth-child(11){ display:none; }
         .etf-table th:nth-child(1){ width:9%; }
         .etf-table th:nth-child(2){ width:7%; }
@@ -350,3 +357,4 @@
       }
       .step-link{ display:inline-flex; align-items:center; }
       .nw{ white-space:nowrap; }
+      .print-br{ display:none; }
