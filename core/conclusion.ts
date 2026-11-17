@@ -11,6 +11,7 @@ export interface ConclusionInput {
   lifeExpectancy: number;
   cap: number; // earliestRetirementCap（試算上限年齡）
   scenario?: boolean; // 三情境模式時，句尾加「（中性情境）」
+  finalAssetsText?: string; // 預期壽命時剩餘資產的顯示字串（由 UI 依口徑/單位格式化後傳入）
 }
 
 /** 結果頁大字結論（第六節第 2 點的句型） */
@@ -18,13 +19,16 @@ export function plainConclusion(i: ConclusionInput): string {
   const L = i.lifeExpectancy;
   let s: string;
   if (i.earliest.type === "already") {
+    // 沿用 Phase 4.1 的 earliestMain／earliestSub 說法
     s = i.earliest.lastsToLife
-      ? `你已屆退休年齡，資產可撐到 ${L} 歲。`
-      : `你已屆退休年齡，資產會在 ${i.earliest.exhaustAge} 歲用完。`;
+      ? `已退休，可撐到預期壽命。目前已是退休狀態，在這組假設下，資產可撐到預期壽命 ${L} 歲。`
+      : `已退休，資產不足以撐到預期壽命。目前已是退休狀態，但資產將在 ${i.earliest.exhaustAge} 歲耗盡，撐不到預期壽命 ${L} 歲。`;
   } else if (i.earliest.type === "age") {
     const first = `照目前的存法，你最早大約 ${i.earliest.age} 歲就能退休，資產可以撐到 ${L} 歲。`;
     const second = i.res.exhaustAge === null
-      ? `你預計 ${i.retireAge} 歲退休，資產可以撐到 ${L} 歲。`
+      ? (i.finalAssetsText
+          ? `你預計 ${i.retireAge} 歲退休，到 ${L} 歲時還會剩約 ${i.finalAssetsText}。`
+          : `你預計 ${i.retireAge} 歲退休，資產可以撐到 ${L} 歲。`)
       : `你預計 ${i.retireAge} 歲退休，資產會在 ${i.res.exhaustAge} 歲用完。`;
     s = first + second;
   } else {

@@ -47,3 +47,8 @@ export function defaultRetireSpendByCategory(
   for (const id of CATEGORY_IDS) out[id] = Math.round(totalsByCat[id] * (ratioPct / 100));
   return out;
 }
+
+/** 工作年數 = max(0, 退休年齡 − 現在年齡)（UI 需要年數時呼叫這裡，不自己算） */
+export function workYears(v: { ageNow: number; ageRetire: number }): number {
+  return Math.max(0, v.ageRetire - v.ageNow);
+}
