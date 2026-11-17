@@ -11,6 +11,7 @@ import { computeScenarios, type ScenariosOutcome, type ScenarioOutcome } from ".
 import { goalSavingAnswers, goalSpendAnswers, goalEarliestAnswers } from "../../core/goals";
 import { assetComparison, purchasingPowerSeries, socialVariants } from "../../core/compare";
 import { investCompare } from "../../core/investCompare";
+import { goalsImpact } from "../../core/lifeGoals";
 import { dca, dcaPair } from "../../core/dca";
 import { realToNominal, nominalToReal } from "../../core/rates";
 import { paramValue } from "../../config/defaults";
@@ -101,6 +102,9 @@ function BaseMain({ c, basis, unit }: { c: Computed; basis: Basis; unit: Unit })
             <span><i className="sw exhaust" />資產耗盡點</span>
           </div>
           <Chart res={res} inp={inp} basis={basis} unit={unit} />
+          {(inp.lifeGoals?.length ?? 0) > 0 && (
+            <p className="note">人生大目標：{inp.lifeGoals!.map((g) => `${g.name} ${g.purchaseAge} 歲`).join("、")}（購買那一年資產會先扣頭期款，之後每年還貸款）。</p>
+          )}
         </div>
       </div>
 
@@ -149,9 +153,33 @@ function BaseDetails({ c, basis, unit, onCsv, socialStatusText }: {
           <p className="note">一輩子工作收入：這是依你輸入的薪資與成長率推算的估計值，不是保證。</p>
 
           <p className="note" style={{ marginTop: 10 }}>{DISCLAIMER_SHORT}</p>
-          <p className="print-only">主要假設：現在年齡 {inp.ageNow} 歲、預計退休 {inp.ageRetire} 歲、預期壽命 {inp.ageLife} 歲；通膨率 2%（固定假設）、退休前投資每年報酬率假設 {inp.retPre}%、退休後投資每年報酬率假設 {inp.retPost}%、薪資每年調幅假設 {inp.salaryGrowth}%；{socialStatusText}。</p>
+          <p className="print-only">主要假設：現在年齡 {inp.ageNow} 歲、預計退休 {inp.ageRetire} 歲、預期壽命 {inp.ageLife} 歲；通膨率 2%（固定假設）、退休前投資每年報酬率假設 {inp.retPre}%、退休後投資每年報酬率假設 {inp.retPost}%、薪資每年調幅假設 {inp.salaryGrowth}%；{socialStatusText}{(inp.lifeGoals?.length ?? 0) > 0 ? `；人生大目標：${inp.lifeGoals!.map((g) => `${g.name}（${g.purchaseAge} 歲買，總價 ${fmtPlain(g.price)} 元，頭期 ${g.downMode === "pct" ? `${g.downValue}%` : `${fmtPlain(g.downValue)} 元`}，利率 ${g.loanRatePct}%，${g.loanYears} 年）`).join("、")}` : ""}。</p>
         </div>
       </div>
+
+      {(inp.lifeGoals?.length ?? 0) > 0 && (() => {
+        const impact = goalsImpact(inp);
+        const fmtE = (e: typeof impact.withEarliest) => (e.type === "age" ? `${e.age} 歲` : e.type === "already" ? "已退休" : "無法達成");
+        const diffWan = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${fmtNum(Math.abs(v), unit)} ${unitWord(unit)}`;
+        return (
+          <div className="card chart-block" style={{ marginTop: 16 }}>
+            <div className="card-head"><h2>人生大目標的影響</h2></div>
+            <div className="card-body">
+              <div className="table-scroll">
+                <table className="result-table">
+                  <tbody>
+                    <tr><th></th><th>有大目標</th><th>沒有大目標</th><th>差距</th></tr>
+                    <tr><th>最早可退休年齡</th><td>{fmtE(impact.withEarliest)}</td><td>{fmtE(impact.withoutEarliest)}</td><td>{impact.earliestDiffYears === null ? "—" : impact.earliestDiffYears === 0 ? "相同" : impact.earliestDiffYears > 0 ? `晚了 ${impact.earliestDiffYears} 年` : `早了 ${-impact.earliestDiffYears} 年`}</td></tr>
+                    <tr><th>預計退休時資產</th><td>{money(impact.withRetireAssets, R - A)}</td><td>{money(impact.withoutRetireAssets, R - A)}</td><td>{diffWan(impact.retireAssetsDiff)}</td></tr>
+                    <tr><th>預期壽命時剩餘資產</th><td>{money(impact.withFinalAssets, L - A)}</td><td>{money(impact.withoutFinalAssets, L - A)}</td><td>{diffWan(impact.finalAssetsDiff)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="note">「沒有大目標」是同一組輸入、只把人生大目標拿掉的對照，用來看出大目標對退休時間與資產的影響。</p>
+            </div>
+          </div>
+        );
+      })()}
 
       <details className="card" style={{ marginTop: 16 }}>
         <summary>逐年明細表</summary>
@@ -161,7 +189,7 @@ function BaseDetails({ c, basis, unit, onCsv, socialStatusText }: {
           </div>
           <div className="table-scroll">
             <table className="detail-table">
-              <thead><tr><th>年齡</th><th>年收入</th><th>年支出</th><th>年儲蓄</th><th>投資收益</th><th>年底資產</th>{inp.social && <><th>勞保年金</th><th>勞退月領</th><th>年支出缺口</th></>}</tr></thead>
+              <thead><tr><th>年齡</th><th>年收入</th><th>年支出</th><th>年儲蓄</th><th>投資收益</th><th>年底資產</th>{(inp.lifeGoals?.length ?? 0) > 0 && <><th>大目標一次支出</th><th>貸款還款（年）</th></>}{inp.social && <><th>勞保年金</th><th>勞退月領</th><th>年支出缺口</th></>}</tr></thead>
               <tbody>
                 {res.rows.map((row) => {
                   const cv = (v: number) => fmtNum(basis === "nominal" ? realToNominal(v, inp.inflation / 100, row.t) : v, unit);
@@ -169,6 +197,7 @@ function BaseDetails({ c, basis, unit, onCsv, socialStatusText }: {
                     <tr key={row.age} className={row.phase === "retire" ? "retire-row" : row.phase === "now" ? "now-row" : ""}>
                       <td>{row.age}</td><td>{cv(row.income)}</td><td>{cv(row.expense)}</td>
                       <td>{cv(row.flow)}</td><td>{cv(row.gain)}</td><td>{cv(row.assets)}</td>
+                      {(inp.lifeGoals?.length ?? 0) > 0 && <><td>{cv(row.goalLump)}</td><td>{cv(row.goalPay)}</td></>}
                       {inp.social && <><td>{row.phase === "retire" ? cv(row.li) : "—"}</td><td>{row.phase === "retire" ? cv(row.lp) : "—"}</td><td>{row.phase === "retire" ? cv(row.gap) : "—"}</td></>}
                     </tr>
                   );
@@ -299,8 +328,9 @@ function ScenarioYearly({ c, scen, basis, unit }: { c: Computed; scen: Scenarios
   const byId = Object.fromEntries(scen.scenarios.map((x) => [x.id, x])) as Record<ScenarioId, ScenarioOutcome>;
   const detail = byId[detailId];
   const downloadScenCsv = () => {
-    const head = "年齡,年收入(元，今日幣值),年支出(元，今日幣值),年儲蓄(元，今日幣值),投資收益(元，今日幣值),年底資產(元，今日幣值)\n";
-    const lines = detail.res.rows.map((r) => [r.age, Math.round(r.income), Math.round(r.expense), Math.round(r.flow), Math.round(r.gain), Math.round(r.assets)].join(","));
+    const hasGoals = (detail.inp.lifeGoals?.length ?? 0) > 0;
+    const head = "年齡,年收入(元，今日幣值),年支出(元，今日幣值),年儲蓄(元，今日幣值),投資收益(元，今日幣值),年底資產(元，今日幣值)" + (hasGoals ? ",大目標一次支出(元，今日幣值),貸款還款(元/年，今日幣值)" : "") + "\n";
+    const lines = detail.res.rows.map((r) => [r.age, Math.round(r.income), Math.round(r.expense), Math.round(r.flow), Math.round(r.gain), Math.round(r.assets), ...(hasGoals ? [Math.round(r.goalLump), Math.round(r.goalPay)] : [])].join(","));
     const blob = new Blob(["\uFEFF" + head + lines.join("\n")], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -324,7 +354,7 @@ function ScenarioYearly({ c, scen, basis, unit }: { c: Computed; scen: Scenarios
           </div>
           <div className="table-scroll">
             <table className="detail-table">
-              <thead><tr><th>年齡</th><th>年收入</th><th>年支出</th><th>年儲蓄</th><th>投資收益</th><th>年底資產</th>{detail.inp.social && <><th>勞保年金</th><th>勞退月領</th><th>年支出缺口</th></>}</tr></thead>
+              <thead><tr><th>年齡</th><th>年收入</th><th>年支出</th><th>年儲蓄</th><th>投資收益</th><th>年底資產</th>{(detail.inp.lifeGoals?.length ?? 0) > 0 && <><th>大目標一次支出</th><th>貸款還款（年）</th></>}{detail.inp.social && <><th>勞保年金</th><th>勞退月領</th><th>年支出缺口</th></>}</tr></thead>
               <tbody>
                 {detail.res.rows.map((row) => {
                   const cv = (v: number) => fmtNum(basis === "nominal" ? realToNominal(v, detail.inflationPct / 100, row.t) : v, unit);
@@ -332,6 +362,7 @@ function ScenarioYearly({ c, scen, basis, unit }: { c: Computed; scen: Scenarios
                     <tr key={row.age} className={row.phase === "retire" ? "retire-row" : row.phase === "now" ? "now-row" : ""}>
                       <td>{row.age}</td><td>{cv(row.income)}</td><td>{cv(row.expense)}</td>
                       <td>{cv(row.flow)}</td><td>{cv(row.gain)}</td><td>{cv(row.assets)}</td>
+                      {(detail.inp.lifeGoals?.length ?? 0) > 0 && <><td>{cv(row.goalLump)}</td><td>{cv(row.goalPay)}</td></>}
                       {detail.inp.social && <><td>{row.phase === "retire" ? cv(row.li) : "—"}</td><td>{row.phase === "retire" ? cv(row.lp) : "—"}</td><td>{row.phase === "retire" ? cv(row.gap) : "—"}</td></>}
                     </tr>
                   );
@@ -535,7 +566,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
   const years = Math.min(50, Math.max(1, Math.floor(num(yearsStr)) || paramValue("dcaCompareYears")));
   const cashRet = ASSET_MAP["cash"].returns.neutral.value;
   const cmp = useMemo(
-    () => investCompare({ base: inp, monthlyStart: monthly, stepPct, cashRetPct: cashRet }),
+    () => investCompare({ base: { ...inp, lifeGoals: null }, monthlyStart: monthly, stepPct, cashRetPct: cashRet }),
     [inp, monthly, stepPct, cashRet]
   );
   const money = (v: number, t: number) => fmtMoney(v, t, inp.inflation, basis, unit);
@@ -575,6 +606,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
       <div className="card" style={{ marginTop: 16 }}>
         <div className="card-head"><h2>每月定期定額投資 vs 全部放定存</h2></div>
         <div className="card-body">
+          {(inp.lifeGoals?.length ?? 0) > 0 && <p className="note">此處不含人生大目標：這張卡是投資方式的教育性對照，大目標的影響請看「明細與說明」的「人生大目標的影響」。</p>}
           <div className="grid2">
             <div>
               <label htmlFor="dcaMonthly">每月定期定額金額 <span className="unit-hint">（元，今日幣值）</span></label>
@@ -612,6 +644,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
             <input id="dcaYears" type="number" inputMode="numeric" step="1" value={yearsStr} onChange={(e) => setYearsStr(e.target.value)} />
           </div>
           <p className="note">每月金額與每年調高幅度使用上方投資對照卡的同一組欄位（每月 {fmtPlain(monthly)} 元、每年調高 {fmtRatePct(stepPct / 100)}）。</p>
+          {(inp.lifeGoals?.length ?? 0) > 0 && <p className="note">此處不含人生大目標。</p>}
           <div className="callout">{dynStatement}</div>
           <p className="note">試算一律使用本站的假設報酬（推算邏輯見 PARAMETERS.md），不是各 ETF 的歷史報酬；歷史報酬欄只是參考，成立時間短的參考價值更低。</p>
           <p className="note">{COMPLIANCE}</p>
