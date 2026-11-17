@@ -612,14 +612,14 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
           <div className="table-scroll etf-table-wrap">
             <table className="scen-table etf-table">
               <thead><tr>
-                <th>名稱</th><th>類型</th><th>成立年份</th><th>總費用率（2025 年度）</th><th>中性假設年化報酬</th>
-                <th>累積投入本金（{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）</th><th>{years} 年後（每年加碼）</th><th>{years} 年後（固定金額）</th>
-                <th>保守–樂觀區間（每年加碼）</th><th>成立以來實際含息年化（參考）</th><th>風險提示</th>
+                <th>名稱</th><th>類型</th><th><span className="nw">成立</span><br className="print-br" /><span className="nw">年份</span></th><th><span className="nw">總費用率</span><br className="print-br" /><span className="nw">（2025 年度）</span></th><th><span className="nw">中性假設</span><br className="print-br" /><span className="nw">年化報酬</span></th>
+                <th><span className="nw">累積投入本金</span><br className="print-br" /><span className="nw">（{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）</span></th><th><span className="nw">{years} 年後</span><br className="print-br" /><span className="nw">（每年加碼）</span></th><th><span className="nw">{years} 年後</span><br className="print-br" /><span className="nw">（固定金額）</span></th>
+                <th><span className="nw">保守–樂觀區間</span><br className="print-br" /><span className="nw">（每年加碼）</span></th><th><span className="nw">成立以來實際</span><br className="print-br" /><span className="nw">含息年化</span><br className="print-br" /><span className="nw">（參考）</span></th><th>風險提示</th>
               </tr></thead>
               <tbody>
                 {etfRows.map(({ a, pair, cons, opt }) => (
                   <tr key={a.id}>
-                    <th>{a.id === "cash" ? "定存（基準）" : a.label}</th>
+                    <th>{a.id === "cash" ? <><span className="nw">定存</span><br className="print-br" /><span className="nw">（基準）</span></> : a.label}</th>
                     <td>{a.category}</td>
                     <td>{a.inceptionDate ? a.inceptionDate.slice(0, 4) : "—"}</td>
                     <td>{a.expenseRatioPct !== null ? `${a.expenseRatioPct}%` : "—"}</td>
@@ -664,11 +664,13 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
             ))}
           </div>
           <p className="note">金額單位：{unitWord(unit)}（{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）。</p>
+          <div className="chart-block">
           <h3 style={{ margin: "14px 0 6px" }}>累積曲線（中性、每年加碼）</h3>
           <div className="legend">
             {chartSeries.map((s) => <span key={s.label}><i className="sw" style={{ background: s.color }} />{s.label}</span>)}
           </div>
           <MultiLineChart series={chartSeries} unit={unit} />
+          </div>
           <h3 style={{ margin: "16px 0 6px" }}>為什麼大盤型 ETF 常被拿來定期定額</h3>
           <p className="note">大盤型（市值型）ETF 一次買進一整個市場的大型公司，不用自己選股，成分股會定期調整，內扣費用通常也比較低。定期定額是每個月固定投入，漲的時候買到的單位少、跌的時候買到的單位多，不用猜進場時間。短期一定會遇到下跌，有時跌幅很大；長期持有、持續投入，才有機會接近長期平均報酬，但沒有任何保證，也可能虧損。高股息型和產業集中型 ETF 各有不同的風險與成本，請看各檔的風險提示（列印版在表格下方）。</p>
           <p className="note">{COMPLIANCE}</p>
