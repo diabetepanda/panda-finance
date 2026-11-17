@@ -43,7 +43,7 @@ function BaseMain({ c, basis, unit }: { c: Computed; basis: Basis; unit: Unit })
   const A = inp.ageNow, R = inp.ageRetire, L = inp.ageLife;
   const money = (v: number, t: number) => fmtMoney(v, t, inp.inflation, basis, unit);
   const rawMoney = (real: number, realNom: number) =>
-    basis === "nominal" ? `${fmtNum(realNom, unit)} ${unitWord(unit)}（帳面金額（含通膨））` : `${fmtNum(real, unit)} ${unitWord(unit)}（今日幣值）`;
+    basis === "nominal" ? `${fmtNum(realNom, unit)} ${unitWord(unit)}（帳面金額，含通膨）` : `${fmtNum(real, unit)} ${unitWord(unit)}（今日幣值）`;
 
   let earliestMain = "", earliestSub = "";
   if (earliest.type === "already") {
@@ -125,7 +125,7 @@ function BaseDetails({ c, basis, unit, onCsv, socialStatusText }: {
   const A = inp.ageNow, R = inp.ageRetire, L = inp.ageLife;
   const money = (v: number, t: number) => fmtMoney(v, t, inp.inflation, basis, unit);
   const rawMoney = (real: number, realNom: number) =>
-    basis === "nominal" ? `${fmtNum(realNom, unit)} ${unitWord(unit)}（帳面金額（含通膨））` : `${fmtNum(real, unit)} ${unitWord(unit)}（今日幣值）`;
+    basis === "nominal" ? `${fmtNum(realNom, unit)} ${unitWord(unit)}（帳面金額，含通膨）` : `${fmtNum(real, unit)} ${unitWord(unit)}（今日幣值）`;
   return (
     <>
       <div className="card" style={{ marginTop: 16 }}>
@@ -136,7 +136,7 @@ function BaseDetails({ c, basis, unit, onCsv, socialStatusText }: {
             <tr><th>每月結餘</th><td>{money(c.monthlyBalance, 0)}</td></tr>
             <tr><th>儲蓄率</th><td>{fmtPct(c.savingsRate)}</td></tr>
             <tr><th>一輩子工作收入估算（實質）</th><td>{fmtNum(res.lifetimeReal, unit)} {unitWord(unit)}（今日幣值）</td></tr>
-            <tr><th>一輩子工作收入估算（帳面金額（含通膨））</th><td>{fmtNum(res.lifetimeNom, unit)} {unitWord(unit)}（帳面金額（含通膨））</td></tr>
+            <tr><th>一輩子工作收入估算（帳面金額，含通膨）</th><td>{fmtNum(res.lifetimeNom, unit)} {unitWord(unit)}（帳面金額，含通膨）</td></tr>
             <tr><th>退休時預估資產</th><td>{money(res.retireAssets, R - A)}</td></tr>
             <tr><th>退休所需資金</th><td>{res.required > 0 ? money(res.required, R - A) : `0 ${unitWord(unit)}${basisTag(basis)}`}</td></tr>
             <tr><th>資金達成率</th><td>{res.achieve === null ? "—" : fmtPct(res.achieve)}</td></tr>
@@ -258,7 +258,7 @@ function ScenarioMain({ c, scen, basis, unit }: { c: Computed; scen: ScenariosOu
       <div className="card" style={{ marginTop: 16 }}>
         <div className="card-head"><h2>三種情境摘要</h2></div>
         <div className="card-body">
-          <p className="note">帳面金額（含通膨）一律以「該情境自己的通膨率」換算。</p>
+          <p className="note">帳面金額，含通膨一律以「該情境自己的通膨率」換算。</p>
           <div className="table-scroll">
             <table className="scen-table">
               <thead><tr><th></th>{SCENARIO_IDS.map((id) => <th key={id}>{SCENARIO_LABELS[id]}（通膨 {byId[id].inflationPct}%、退休前報酬 {fmtRatePct(byId[id].preReturnPct / 100)}、退休後 {fmtRatePct(byId[id].postReturnPct / 100)}）</th>)}</tr></thead>
@@ -339,7 +339,7 @@ function ScenarioYearly({ c, scen, basis, unit }: { c: Computed; scen: Scenarios
               </tbody>
             </table>
           </div>
-          <p className="note">金額單位：{unitWord(unit)}{basisTag(basis)}；帳面金額（含通膨）以{SCENARIO_LABELS[detailId]}情境通膨 {detail.inflationPct}% 換算。退休期間的年儲蓄欄為每年支出缺口的負值。</p>
+          <p className="note">金額單位：{unitWord(unit)}{basisTag(basis)}；帳面金額，含通膨以{SCENARIO_LABELS[detailId]}情境通膨 {detail.inflationPct}% 換算。退休期間的年儲蓄欄為每年支出缺口的負值。</p>
           <p className="note">組合報酬率：退休前 {fmtRatePct(detail.preReturnPct / 100)}／年、退休後 {fmtRatePct(detail.postReturnPct / 100)}／年（含通膨，匯率調整後加權）。</p>
         </div>
       </details>
@@ -536,7 +536,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
   const workYears = Math.max(0, inp.ageRetire - inp.ageNow);
   const dyn = cmp.dyn;
   const dynStatement = stepPct > 0 ? (
-    <>這個結果假設你的定期定額金額會隨薪水每年調高 {fmtRatePct(stepPct / 100)}：第 1 年每月 {fmtPlain(dyn.aMonthly)} 元 → 第 {dyn.years} 年每月約 {fmtPlain(Math.round(dyn.lastMonthlyNominal))} 元（今日幣值約 {fmtPlain(Math.round(dyn.lastMonthlyReal))} 元）。你必須真的每年跟著加碼，才會得到這個金額；如果金額一直不變，結果會是 {fmtPlain(Math.round(dyn.fixedRetireAssetsReal))} 元（今日幣值）／{fmtPlain(Math.round(dyn.fixedRetireAssetsNominal))} 元（帳面金額（含通膨））。</>
+    <>這個結果假設你的定期定額金額會隨薪水每年調高 {fmtRatePct(stepPct / 100)}：第 1 年每月 {fmtPlain(dyn.aMonthly)} 元 → 第 {dyn.years} 年每月約 {fmtPlain(Math.round(dyn.lastMonthlyNominal))} 元（今日幣值約 {fmtPlain(Math.round(dyn.lastMonthlyReal))} 元）。你必須真的每年跟著加碼，才會得到這個金額；如果金額一直不變，結果會是 {fmtPlain(Math.round(dyn.fixedRetireAssetsReal))} 元（今日幣值）／{fmtPlain(Math.round(dyn.fixedRetireAssetsNominal))} 元（帳面金額，含通膨）。</>
   ) : (
     <>這個結果假設你每月固定投入 {fmtPlain(dyn.aMonthly)} 元，不調高。</>
   );
@@ -607,7 +607,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
             <table className="scen-table etf-table">
               <thead><tr>
                 <th>名稱</th><th>類型</th><th>成立年份</th><th>總費用率（2025 年度）</th><th>中性假設年化報酬</th>
-                <th>累積投入本金（{basis === "nominal" ? "帳面金額（含通膨）" : "今日幣值"}）</th><th>{years} 年後（每年加碼）</th><th>{years} 年後（固定金額）</th>
+                <th>累積投入本金（{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）</th><th>{years} 年後（每年加碼）</th><th>{years} 年後（固定金額）</th>
                 <th>保守–樂觀區間（每年加碼）</th><th>成立以來實際含息年化（參考）</th><th>風險提示</th>
               </tr></thead>
               <tbody>
@@ -633,7 +633,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
               </tbody>
             </table>
           </div>
-          <p className="note">金額單位：{unitWord(unit)}（{basis === "nominal" ? "帳面金額（含通膨）" : "今日幣值"}）。</p>
+          <p className="note">金額單位：{unitWord(unit)}（{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）。</p>
           <h3 style={{ margin: "14px 0 6px" }}>累積曲線（中性、每年加碼）</h3>
           <div className="legend">
             {chartSeries.map((s) => <span key={s.label}><i className="sw" style={{ background: s.color }} />{s.label}</span>)}
@@ -849,11 +849,15 @@ export default function ResultsPage(p: ResultsPageProps) {
   const scen = c.scenarios;
   const scenActive = !!(scen && !scen.paused);
   const neu = scenActive ? scen!.scenarios.find((x) => x.id === "neutral")! : null;
+  const activeRes = neu ? neu.res : c.res;
   const conclusion = plainConclusion({
     earliest: neu ? neu.earliest : c.earliest,
-    res: neu ? neu.res : c.res,
+    res: activeRes,
     retireAge: c.inp.ageRetire, lifeExpectancy: c.inp.ageLife,
     cap: paramValue("earliestRetirementCap"), scenario: !!neu,
+    finalAssetsText: activeRes.exhaustAge === null
+      ? fmtMoney(activeRes.finalAssets, c.inp.ageLife - c.inp.ageNow, neu ? neu.inflationPct : c.inp.inflation, p.basis, p.unit)
+      : undefined,
   });
   const socialStatusText = p.formDb.laborInsured === "no"
     ? "勞保：沒有"
@@ -886,7 +890,7 @@ export default function ResultsPage(p: ResultsPageProps) {
         <span><span className="tg-label">金額口徑</span>
           <span className="seg" role="group" aria-label="金額口徑">
             <button type="button" aria-pressed={p.basis === "real"} onClick={() => p.setBasis("real")}>今日幣值（用今天的物價換算）</button>
-            <button type="button" aria-pressed={p.basis === "nominal"} onClick={() => p.setBasis("nominal")}>帳面金額（含通膨）</button>
+            <button type="button" aria-pressed={p.basis === "nominal"} onClick={() => p.setBasis("nominal")}>帳面金額，含通膨</button>
           </span></span>
         <span><span className="tg-label">顯示單位</span>
           <span className="seg" role="group" aria-label="顯示單位">
@@ -894,7 +898,7 @@ export default function ResultsPage(p: ResultsPageProps) {
             <button type="button" aria-pressed={p.unit === "yuan"} onClick={() => p.setUnit("yuan")}>元</button>
           </span></span>
       </div>
-      <p className="note">今日幣值是把未來的錢換成今天的物價，方便跟現在的生活費比較；帳面金額（含通膨）是未來當時的金額，數字會看起來比較大。</p>
+      <p className="note">今日幣值是把未來的錢換成今天的物價，方便跟現在的生活費比較；帳面金額，含通膨是未來當時的金額，數字會看起來比較大。</p>
 
       {scen && scen.paused ? (
         <div className="card" style={{ marginTop: 16 }}><div className="card-body">
