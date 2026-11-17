@@ -26,7 +26,7 @@ export function unitWord(unit: Unit): string {
 }
 
 export function basisTag(basis: Basis): string {
-  return basis === "nominal" ? "（帳面金額（含通膨））" : "（今日幣值）";
+  return basis === "nominal" ? "（帳面金額，含通膨）" : "（今日幣值）";
 }
 
 /** 依目前口徑/單位格式化金額：realVal 為實質（今日幣值）金額，t 為經過年數 */

@@ -65,7 +65,7 @@ export default function Chart({ res, inp, basis, unit }: Props) {
       )}
       <text x={L} y={H - 4} fontSize="11" fill="var(--ink-soft)">年齡（歲）</text>
       <text x={W - Rm} y={H - 4} textAnchor="end" fontSize="11" fill="var(--ink-soft)">
-        年底資產（{unitWord(unit)}，{basis === "nominal" ? "帳面金額（含通膨）" : "今日幣值"}）
+        年底資產（{unitWord(unit)}，{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）
       </text>
       {inp.ageRetire > aMin && inp.ageRetire < aMax && (
         <g>

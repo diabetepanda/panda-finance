@@ -37,6 +37,19 @@ export default function App() {
     navRef.current?.scrollIntoView({ block: "start" });
   }, [step]);
 
+  // 列印時展開所有收合區塊（逐年明細、計算說明等），印完恢復原狀態
+  useEffect(() => {
+    let saved: { el: HTMLDetailsElement; open: boolean }[] = [];
+    const before = () => {
+      saved = Array.from(document.querySelectorAll("details")).map((el) => ({ el, open: el.open }));
+      saved.forEach(({ el }) => { el.open = true; });
+    };
+    const after = () => { saved.forEach(({ el, open }) => { el.open = open; }); saved = []; };
+    window.addEventListener("beforeprint", before);
+    window.addEventListener("afterprint", after);
+    return () => { window.removeEventListener("beforeprint", before); window.removeEventListener("afterprint", after); };
+  }, []);
+
   const inp = useMemo(() => toInput(debounced), [debounced]);
   const validation: ValidationResult = useMemo(() => validateInput(inp), [inp]);
   const computed = useMemo(() => {
@@ -132,7 +145,7 @@ export default function App() {
           <p className="subtitle">台灣上班族理財規劃與退休試算</p>
         </header>
 
-        <div ref={navRef}>
+        <div ref={navRef} className={`stepnav-wrap ${step === 4 ? "navwrap-results" : "navwrap-steps"}`}>
           <StepNav step={step} visited={visited} onGo={goStep} />
         </div>
 

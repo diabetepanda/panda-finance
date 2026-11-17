@@ -104,7 +104,7 @@ export function toInput(f: FormState): SimInput {
     retireSpendCategories: null,
     social: resolveSocialInput({
       laborInsured: f.laborInsured, socialInputMode: f.socialInputMode,
-      ageNow: num(f.ageNow), startWorkAge: num(f.startWorkAge),
+      ageNow: num(f.ageNow), startWorkAge: f.startWorkAge.trim() === "" ? NaN : num(f.startWorkAge),
       grossSalary: f.grossSalary.trim() === "" ? NaN : num(f.grossSalary),
       monthlyIncome: num(f.monthlyIncome),
       liExistingYears: num(f.liExistingYears), liAvgSalary: num(f.liAvgSalary), liSalaryManual: f.liSalaryManual,

@@ -1,5 +1,6 @@
 
       :root{
+        --privacy-h:37px; /* 隱私條高度（捲動偏移與列印以外的版面計算用） */
         --bg:#f4f7f5;
         --surface:#ffffff;
         --surface-2:#eef4f1;
@@ -69,7 +70,11 @@
       .step-page{ max-width:760px; margin:14px auto 0; }
       .results-wrap{ max-width:1100px; margin:14px auto 0; }
       .results-wrap.offscreen{ display:none; }
+      .stepnav-wrap{ scroll-margin-top:calc(var(--privacy-h) + 8px); }
+      .navwrap-steps{ max-width:760px; margin:0 auto; }
+      .navwrap-results{ max-width:1100px; margin:0 auto; }
       .stepnav{ display:flex; gap:8px; margin-top:16px; overflow-x:auto; padding-bottom:4px; }
+      .step-tab{ min-height:44px; }
       .step-tab{ background:transparent; color:var(--ink-soft); border:1px solid var(--line); white-space:nowrap; display:flex; align-items:center; gap:7px; padding:8px 14px; }
       .step-tab.current{ background:var(--brand); color:var(--brand-ink); border-color:var(--brand); font-weight:700; }
       .step-num{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; border:1.5px solid currentColor; font-size:.82rem; flex:none; }
@@ -94,6 +99,10 @@
         .step-actions button{ min-height:44px; flex:1 1 auto; }
         input[type="number"], input[type="text"]{ font-size:16px; }
         .conclusion-line{ font-size:1.3rem; }
+        .expense-row .del{ min-width:44px; min-height:44px; }
+        .etf-table td, .etf-table th{ white-space:nowrap; }
+        .etf-table td:nth-child(10), .etf-table td:nth-child(11){ white-space:normal; min-width:10em; }
+        .etf-table th:first-child{ white-space:normal; min-width:6em; }
       }
       .card{
         background:var(--surface); border:1px solid var(--line); border-radius:14px;
@@ -151,7 +160,7 @@
       }
       @media (max-width:480px){
         .expense-head{ display:none; }
-        .expense-row{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px; }
+        .expense-row{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px; }
         .expense-row .f-end{ grid-column:1 / 3; }
       }
       .totals{
