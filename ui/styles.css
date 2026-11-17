@@ -136,8 +136,7 @@
       .seg button[aria-pressed="true"]{ background:var(--brand); color:var(--brand-ink); font-weight:700; }
       .toggle-row{ display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; margin:2px 0 4px; }
       .toggle-row .tg-label{ font-size:.88rem; color:var(--ink-soft); margin-right:8px; }
-      .summary-sticky{ }
-      @media (min-width:921px){ .summary-sticky{ position:sticky; top:52px; z-index:5; } }
+      .summary-block{ }
       .summary-grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
       @media (max-width:480px){ .summary-grid{ grid-template-columns:1fr 1fr; gap:10px; } }
       .sum-card{
@@ -218,7 +217,7 @@
         .privacy-bar{ position:static; }
         .inputs-col, .no-print, .example-banner{ display:none !important; }
         .layout{ grid-template-columns:1fr; }
-        .summary-sticky{ position:static; }
+        .summary-block{ position:static; }
         .print-only{ display:block; }
         body{ background:#fff; }
         details.card{ break-inside:avoid; }

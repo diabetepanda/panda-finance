@@ -725,7 +725,7 @@ function Results({ c, basis, unit, setBasis, setUnit, onCsv }: {
 
   return (
     <>
-      <div className="summary-sticky">
+      <div className="summary-block">
         <div className="summary-grid">
           <div className="sum-card">
             <div className="k">退休時預估資產</div>
@@ -929,7 +929,7 @@ function ScenarioResults({ c, scen, basis, unit, setBasis, setUnit }: {
       <p className="range-line">
         保守到樂觀情境下，退休時資產約落在 {moneyOf(cons)(cons.res.retireAssets, R - A)} 到 {moneyOf(opt)(opt.res.retireAssets, R - A)} 之間{basisTag(basis)}。這是依假設值推算的區間，不是預測。
       </p>
-      <div className="summary-sticky" style={{ marginTop: 12 }}>
+      <div className="summary-block" style={{ marginTop: 12 }}>
         <div className="summary-grid">
           <div className="sum-card">
             <div className="k">退休時預估資產（中性情境）</div>
