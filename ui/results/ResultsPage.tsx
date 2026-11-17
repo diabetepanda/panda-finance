@@ -92,7 +92,7 @@ function BaseMain({ c, basis, unit }: { c: Computed; basis: Basis; unit: Unit })
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card chart-block" style={{ marginTop: 16 }}>
         <div className="card-head"><h2>資產隨年齡變化</h2></div>
         <div className="card-body">
           <div className="legend">
@@ -105,7 +105,7 @@ function BaseMain({ c, basis, unit }: { c: Computed; basis: Basis; unit: Unit })
       </div>
 
       {res.socialDetail && (
-        <div className="card" style={{ marginTop: 16 }}>
+        <div className="card chart-block" style={{ marginTop: 16 }}>
           <div className="card-head"><h2>退休收入來源結構</h2></div>
           <div className="card-body">
             <IncomeStackChart res={res} unit={unit} />
@@ -275,7 +275,7 @@ function ScenarioMain({ c, scen, basis, unit }: { c: Computed; scen: ScenariosOu
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card chart-block" style={{ marginTop: 16 }}>
         <div className="card-head"><h2>三情境資產曲線</h2></div>
         <div className="card-body">
           <div className="toggle-row no-print">
@@ -470,6 +470,7 @@ function CompareCard({ c, form, unit }: { c: Computed; form: FormState; unit: Un
     <div className="card" style={{ marginTop: 16 }}>
       <div className="card-head"><h2>圖表比較</h2></div>
       <div className="card-body">
+        <div className="chart-block">
         <h3 style={{ margin: "6px 0" }}>各標的在假設報酬率下的資產比較</h3>
         <div style={{ maxWidth: 260 }}>
           <label htmlFor="cmpYears">比較年數 N（年，1–40）</label>
@@ -477,6 +478,7 @@ function CompareCard({ c, form, unit }: { c: Computed; form: FormState; unit: Un
         </div>
         <p className="note">假設每月結餘 100% 投入單一標的，{nYears} 年後資產（實質口徑，今日幣值）。</p>
         <AssetRangeBars rows={compareRows.map((r) => ({ label: r.label, cons: r.values.conservative, neu: r.values.neutral, opt: r.values.optimistic }))} unit={unit} />
+        </div>
         <details>
           <summary>標的比較資料表</summary>
           <table className="scen-table"><thead><tr><th>標的</th><th>保守</th><th>中性</th><th>樂觀</th></tr></thead>
@@ -485,6 +487,7 @@ function CompareCard({ c, form, unit }: { c: Computed; form: FormState; unit: Un
             ))}</tbody></table>
         </details>
 
+        <div className="chart-block">
         <h3 style={{ margin: "16px 0 6px" }}>配置的資產曲線比較（中性情境）</h3>
         <div style={{ maxWidth: 260 }}>
           <label htmlFor="cmpAsset">單一標的選擇</label>
@@ -493,10 +496,13 @@ function CompareCard({ c, form, unit }: { c: Computed; form: FormState; unit: Un
           </select>
         </div>
         {allocSeries.length ? <MultiLineChart series={allocSeries} unit={unit} /> : <p className="note">請先讓配置總和為 100%。</p>}
+        </div>
 
+        <div className="chart-block">
         <h3 style={{ margin: "16px 0 6px" }}>通膨影響對照</h3>
         <PurchasingPowerChart series={ppSeries} amount={1000000} unit={unit} />
         <p className="note">{Math.max(0, c.inp.ageRetire - c.inp.ageNow)} 年後的 100 萬（帳面金額），實際購買力相當於今天的 {fmtNum(ppAtRetire, unit)} {unitWord(unit)}（以通膨 {c.inp.inflation}% 計算）。</p>
+        </div>
 
         <h3 style={{ margin: "16px 0 6px" }}>勞保勞退影響對照</h3>
         {variants.length ? (
