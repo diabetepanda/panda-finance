@@ -1,18 +1,18 @@
-# TEST_REPORT.md｜測試報告（Phase 5.1，2026-11-17）
+# TEST_REPORT.md｜測試報告（Phase 5.2，2026-11-17）
 
 測試框架：Vitest。執行：`npm test`。GitHub Actions 每次部署前自動執行，沒過不部署。
 
 ## 結果總覽
 
 ```
-✓ tests/phase5.test.ts (23 tests)
+✓ tests/phase5.test.ts (25 tests)
 ✓ tests/phase4.test.ts (18 tests)
 ✓ tests/phase32.test.ts (7 tests)
 ✓ tests/phase3.test.ts (16 tests)
 ✓ tests/phase2.test.ts (12 tests)
 ✓ tests/phase1.test.ts (13 tests)
 Test Files  6 passed (6)
-Tests  89 passed (89)，失敗 0
+Tests  91 passed (91)，失敗 0
 ```
 
 ## 案例清單與狀態
@@ -81,7 +81,7 @@ Tests  89 passed (89)，失敗 0
 
 其餘既有測試無期望值變動：phase2 案例 9 讀 0050 中性 7%（不變）；phase2 情境通膨為明寫 3／2／1.5（不受預設改 2.5 影響）；resolveScenarioInflation 與類別通膨測試保留（core 函式保留）。
 
-## Phase 5／5.1（tests/phase5.test.ts，23 項）
+## Phase 5／5.1／5.2（tests/phase5.test.ts，25 項）
 
 | 類別 | 內容 | 結果 |
 |---|---|---|
@@ -99,3 +99,5 @@ Tests  89 passed (89)，失敗 0
 | 驗收 F | 舊檔 socialEnabled true 匯入後仍是 A、false 是 B | 通過 |
 
 Phase 5.1 新增 1 項：startWorkAge 空白時 toInput 的 social 與開始工作 30 歲逐欄相同（年資 0、勞退帳戶 0），預設範例結果仍為 2,374.5 萬／0／—／45 歲。總數 89 項（66＋23）。
+
+Phase 5.2 新增 2 項：列印 details 展開/恢復邏輯（ui/printDetails.ts）——連續兩次 beforeprint 後 afterprint，原本收合的恢復收合、原本展開的維持展開；無記錄時 restore 不改變狀態。結論句期望文字依 Phase 5.2 新句型更新（第一句刪除「資產可以撐到 {L} 歲」）。總數 91 項。

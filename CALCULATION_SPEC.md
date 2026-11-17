@@ -168,7 +168,7 @@
 ### core/conclusion.ts `plainConclusion(...)` / `shortConclusionLine(...)`
 
 - 輸入：earliest、res、retireAge、lifeExpectancy、cap、scenario（可選）。
-- 有最早年齡：「照目前的存法，你最早大約 {age} 歲就能退休，資產可以撐到 {L} 歲。」＋依計畫退休年齡的結果接「你預計 {R} 歲退休，到 {L} 歲時還會剩約 {X}。」（X 由 UI 依目前口徑/單位以 fmtMoney 格式化後以 finalAssetsText 傳入；Phase 5.1 改版）或「你預計 {R} 歲退休，資產會在 {X} 歲用完。」
+- 有最早年齡：「照目前的存法，你最早大約 {age} 歲就能退休。」＋依計畫退休年齡的結果接「你預計 {R} 歲退休，到 {L} 歲時還會剩約 {X}。」（X 由 UI 依目前口徑/單位以 fmtMoney 格式化後以 finalAssetsText 傳入）或「你預計 {R} 歲退休，資產會在 {X} 歲用完。」（Phase 5.2 起第一句不再重複撐到幾歲）
 - 無法達成：「照目前的存法，到 {cap} 歲前都還不能安心退休。可以到下方『怎麼改善』看看要多存多少。」
 - 已退休：沿用 Phase 4.1 的 earliestMain／earliestSub 說法——「已退休，可撐到預期壽命。目前已是退休狀態，在這組假設下，資產可撐到預期壽命 {L} 歲。」或「已退休，資產不足以撐到預期壽命。目前已是退休狀態，但資產將在 {X} 歲耗盡，撐不到預期壽命 {L} 歲。」
 - scenario 為 true 時句尾加「（中性情境）」。shortConclusionLine 是步驟頁「目前試算」小字的短版句型。
