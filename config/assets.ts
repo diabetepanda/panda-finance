@@ -2,7 +2,7 @@
 // 標的清單（規格第 5.1 節）｜Phase 2
 // 每個標的：顯示名稱、資產類別、計價幣別、配息再投入簡化、
 // 三組名目年化報酬率（保守/中性/樂觀，皆為 ParamDef）、風險提示。
-// 報酬率一律標示為「假設值，非預測」，source 一律「待查證」。
+// 報酬率一律標示為「假設值，非預測」；source 見 rp()（Phase 3.2，2026-11-17）。
 // 計價幣別：0050、0056、台積電、定存為 TWD；VOO、QQQ、美國公債為 USD。
 // 匯率調整只對 USD 計價標的做一次（第 5.3 節）。
 // ============================================================
@@ -17,8 +17,17 @@ export const SCENARIO_LABELS: Record<ScenarioId, string> = {
   optimistic: "樂觀",
 };
 
+const SRC_ETF = "假設值（非預測）。歷史報酬可參考發行商官網：VOO https://investor.vanguard.com/investment-products/etfs/profile/voo ；QQQ https://www.invesco.com/qqq-etf/en/home.html ；0050、0056 元大投信 https://www.yuantaetfs.com/ 。";
+const SRC_PLAIN = "假設值（非預測）";
+const SRC_CASH = "假設值（非預測）。參考：二年期定存平均利率 1.7108%（勞動基金運用局公告 https://www.blf.gov.tw/49200/49255/49261/49269/49277/73025/ ）。";
+const ASSET_SOURCES: Record<string, string> = {
+  voo: SRC_ETF, qqq: SRC_ETF, tw0050: SRC_ETF, tw0056: SRC_ETF,
+  usbond: SRC_PLAIN, tsmc: SRC_PLAIN, cash: SRC_CASH,
+};
+
 function rp(id: string, label: string, value: number, note: string): ParamDef {
-  return { id, label, value, unit: "%/年", min: -50, max: 100, source: "待查證", updatedAt: "待填", note };
+  const assetId = id.split(".")[0];
+  return { id, label, value, unit: "%/年", min: -50, max: 100, source: ASSET_SOURCES[assetId] ?? SRC_PLAIN, updatedAt: "2026-11-17", note };
 }
 
 export interface AssetDef {
@@ -39,9 +48,9 @@ function asset(
   return {
     id, label, assetClass, currency, dividendReinvested, riskNote,
     returns: {
-      conservative: rp(`${id}.conservative`, `${label} 保守報酬率（假設值，非預測）`, cons, "暫定假設值，待查證。"),
-      neutral: rp(`${id}.neutral`, `${label} 中性報酬率（假設值，非預測）`, neu, "暫定假設值，待查證。"),
-      optimistic: rp(`${id}.optimistic`, `${label} 樂觀報酬率（假設值，非預測）`, opt, "暫定假設值，待查證。"),
+      conservative: rp(`${id}.conservative`, `${label} 保守報酬率（假設值，非預測）`, cons, "假設值，非預測。"),
+      neutral: rp(`${id}.neutral`, `${label} 中性報酬率（假設值，非預測）`, neu, "假設值，非預測。"),
+      optimistic: rp(`${id}.optimistic`, `${label} 樂觀報酬率（假設值，非預測）`, opt, "假設值，非預測。"),
     },
   };
 }
