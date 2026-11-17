@@ -104,20 +104,24 @@
         .expense-row .del{ min-width:44px; min-height:44px; }
         .tab-btn{ min-height:44px; }
         summary{ min-height:44px; display:flex; align-items:center; }
+        .seg button{ min-height:44px; }
+        button.small{ min-height:44px; }
+        .howto-toggle{ min-height:44px; }
         .table-scroll td, .table-scroll th{ white-space:nowrap; }
         .table-scroll td:first-child, .table-scroll th:first-child{ white-space:normal; min-width:7em; }
         /* 手機 ETF 改卡片式：隱藏表格、顯示卡片 */
         .etf-table-wrap{ display:none; }
         .etf-cards{ display:block; }
-        .etf-card{ border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:12px; background:var(--surface); }
+        .etf-card{ border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:10px; background:var(--surface); }
         .etf-card-head{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
-        .etf-card-head h4{ margin:0; font-size:1rem; }
-        .etf-card-main{ margin-top:6px; white-space:nowrap; }
-        .etf-card-amount{ font-size:1.45rem; font-weight:700; color:var(--brand); }
-        .etf-card-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-top:8px; }
-        .etf-card-grid span{ display:block; font-size:.74rem; color:var(--ink-soft); }
+        .etf-card-head h4{ margin:0; font-size:.95rem; }
+        .etf-card-main{ margin-top:4px; white-space:nowrap; }
+        .etf-card-amount{ font-size:1.4rem; font-weight:700; color:var(--brand); }
+        .etf-card-sub{ font-size:.88rem; color:var(--ink-soft); margin:2px 0 0; white-space:nowrap; }
+        .etf-more summary{ font-weight:600; }
+        .etf-card-grid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-top:6px; }
+        .etf-card-grid span{ display:block; font-size:.82rem; color:var(--ink-soft); }
         .etf-card-grid strong{ font-size:.92rem; white-space:nowrap; }
-        .etf-risk summary{ font-weight:600; }
       }
       .card{
         background:var(--surface); border:1px solid var(--line); border-radius:14px;
@@ -270,9 +274,13 @@
       .print-only{ display:none; }
       @media print{
         .etf-cards{ display:none !important; }
-        .etf-table-wrap{ display:block !important; }
-        .etf-table{ font-size:.7rem; }
-        .etf-table td, .etf-table th{ white-space:normal; }
+        .etf-table-wrap{ display:block !important; overflow:visible; }
+        .etf-table{ width:100%; table-layout:fixed; font-size:9pt; }
+        .etf-table td, .etf-table th{ white-space:normal; word-break:break-word; padding:4px 5px; }
+        .etf-table th:nth-child(11), .etf-table td:nth-child(11){ display:none; }
+        .table-scroll{ overflow:visible; }
+        table.detail, table.detail-table{ font-size:8.5pt; }
+        table.detail td, table.detail th, table.detail-table td, table.detail-table th{ white-space:normal; word-break:break-word; }
         .privacy-bar{ position:static; }
         .stepnav, .step-page, .no-print, .example-banner, .tablist, .save-row{ display:none !important; }
         .results-wrap.offscreen{ display:block !important; }
