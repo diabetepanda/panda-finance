@@ -612,14 +612,14 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
           <div className="table-scroll etf-table-wrap">
             <table className="scen-table etf-table">
               <thead><tr>
-                <th>名稱</th><th>類型</th><th><span className="nw">成立</span><br className="print-br" /><span className="nw">年份</span></th><th><span className="nw">總費用率</span><br className="print-br" /><span className="nw">（2025 年度）</span></th><th><span className="nw">中性假設</span><br className="print-br" /><span className="nw">年化報酬</span></th>
-                <th><span className="nw">累積投入本金</span><br className="print-br" /><span className="nw">（{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）</span></th><th><span className="nw">{years} 年後</span><br className="print-br" /><span className="nw">（每年加碼）</span></th><th><span className="nw">{years} 年後</span><br className="print-br" /><span className="nw">（固定金額）</span></th>
-                <th><span className="nw">保守–樂觀區間</span><br className="print-br" /><span className="nw">（每年加碼）</span></th><th><span className="nw">成立以來實際</span><br className="print-br" /><span className="nw">含息年化</span><br className="print-br" /><span className="nw">（參考）</span></th><th>風險提示</th>
+                <th>名稱</th><th>類型</th><th><span className="ph">成立</span><br className="print-br" /><span className="ph">年份</span></th><th><span className="ph">總費用率</span><br className="print-br" /><span className="ph">（2025 年度）</span></th><th><span className="ph">中性假設</span><br className="print-br" /><span className="ph">年化報酬</span></th>
+                <th><span className="ph">累積投入本金</span><br className="print-br" /><span className="ph">（{basis === "nominal" ? "帳面金額，含通膨" : "今日幣值"}）</span></th><th><span className="ph">{years} 年後</span><br className="print-br" /><span className="ph">（每年加碼）</span></th><th><span className="ph">{years} 年後</span><br className="print-br" /><span className="ph">（固定金額）</span></th>
+                <th><span className="ph">保守–樂觀區間</span><br className="print-br" /><span className="ph">（每年加碼）</span></th><th><span className="ph">成立以來實際</span><br className="print-br" /><span className="ph">含息年化</span><br className="print-br" /><span className="ph">（參考）</span></th><th>風險提示</th>
               </tr></thead>
               <tbody>
                 {etfRows.map(({ a, pair, cons, opt }) => (
                   <tr key={a.id}>
-                    <th>{a.id === "cash" ? <><span className="nw">定存</span><br className="print-br" /><span className="nw">（基準）</span></> : a.label}</th>
+                    <th>{a.id === "cash" ? <><span className="ph">定存</span><br className="print-br" /><span className="ph">（基準）</span></> : a.label}</th>
                     <td>{a.category}</td>
                     <td>{a.inceptionDate ? a.inceptionDate.slice(0, 4) : "—"}</td>
                     <td>{a.expenseRatioPct !== null ? `${a.expenseRatioPct}%` : "—"}</td>
@@ -627,7 +627,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
                     <td>{fmtNum(pick(pair.stepped.principalReal, pair.stepped.principalNominal), unit)}</td>
                     <td>{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)}</td>
                     <td>{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)}</td>
-                    <td><span className="nw">{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)}</span> – <span className="nw">{fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</span></td>
+                    <td><span className="ph">{fmtNum(pick(cons.fvReal, cons.fvNominal), unit)}</span> – <span className="ph">{fmtNum(pick(opt.fvReal, opt.fvNominal), unit)}</span></td>
                     <td>{histText(a)}</td>
                     <td className="risk-cell">{a.riskNote}</td>
                   </tr>
@@ -649,7 +649,7 @@ function InvestSection({ c, basis, unit }: { c: Computed; basis: Basis; unit: Un
                   <span className="etf-card-amount">{fmtNum(pick(pair.stepped.fvReal, pair.stepped.fvNominal), unit)} {unitWord(unit)}</span>
                   <span className="unit-hint">（{years} 年後，每年加碼）</span>
                 </div>
-                <p className="etf-card-sub"><span className="nw">固定金額：{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)} {unitWord(unit)}</span><br /><span className="nw">區間 {fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)} {unitWord(unit)}</span></p>
+                <p className="etf-card-sub"><span className="ph">固定金額：{fmtNum(pick(pair.fixed.fvReal, pair.fixed.fvNominal), unit)} {unitWord(unit)}</span><br /><span className="ph">區間 {fmtNum(pick(cons.fvReal, cons.fvNominal), unit)} – {fmtNum(pick(opt.fvReal, opt.fvNominal), unit)} {unitWord(unit)}</span></p>
                 <details className="etf-more">
                   <summary>更多資訊</summary>
                   <div className="etf-card-grid">
