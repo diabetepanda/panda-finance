@@ -12,6 +12,11 @@ import { ASSETS, SCENARIO_IDS, type ScenarioId } from "../config/assets";
 import { defaultCategoryFor, type CategoryId } from "../config/categories";
 
 export interface ExpenseRow { name: string; amount: string; endAge: string; category: CategoryId; }
+export interface LifeGoalRow {
+  name: string; type: "house" | "car" | "other"; purchaseAge: string; price: string;
+  downMode: "amount" | "pct"; downValue: string; extraCosts: string;
+  loanRatePct: string; loanYears: string;
+}
 export interface FormState {
   ageNow: string; ageRetire: string; ageLife: string;
   initAssets: string; otherRetireIncome: string;
@@ -42,6 +47,8 @@ export interface FormState {
   lrWage: string; lrWageManual: boolean;
   lrEmployerRate: string; lrEmployeeRate: string; lrFundReturn: string;
   lrBalance: string; lrMode: "lump" | "monthly"; lrClaimAge: string;
+  // Phase 6 人生大目標（選填）：預設空陣列 = 沒有大目標，結果與先前完全相同
+  lifeGoals: LifeGoalRow[];
 }
 
 export const num = (s: string): number => (s.trim() === "" ? 0 : Number(s));
@@ -78,6 +85,7 @@ export function defaultForm(): FormState {
     lrEmployerRate: String(socialParamValue("lrEmployerRate")), lrEmployeeRate: "0",
     lrFundReturn: String(socialParamValue("lrFundReturn")),
     lrBalance: "0", lrMode: "lump", lrClaimAge: String(socialParamValue("lrLegalClaimAge")),
+    lifeGoals: [],
   };
 }
 
@@ -97,6 +105,11 @@ export function toInput(f: FormState): SimInput {
       category: e.category ?? "other",
     })),
     retireSpend,
+    lifeGoals: f.lifeGoals.length === 0 ? null : f.lifeGoals.map((g) => ({
+      name: g.name, type: g.type, purchaseAge: num(g.purchaseAge), price: num(g.price),
+      downMode: g.downMode, downValue: num(g.downValue), extraCosts: num(g.extraCosts),
+      loanRatePct: num(g.loanRatePct), loanYears: num(g.loanYears),
+    })),
     inflation: paramValue("inflation"), // Phase 4：通膨固定 2%，不再由使用者輸入
     retPre: num(f.retPre), retPost: num(f.retPost),
     extraMonthlySaving: 0,

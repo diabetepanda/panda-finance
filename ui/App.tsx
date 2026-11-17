@@ -2,7 +2,7 @@
 // 欄位與結果分別在 ui/steps/* 與 ui/results/ResultsPage.tsx；計算一律在 core/。
 import { useEffect, useMemo, useRef, useState } from "react";
 import { validateInput, type ValidationResult } from "../core/validate";
-import { pickKnownFields, migrateLegacyForm } from "../core/importForm";
+import { pickKnownFields, migrateLegacyForm, sanitizeLifeGoals } from "../core/importForm";
 import { shortConclusionLine } from "../core/conclusion";
 import { paramValue } from "../config/defaults";
 import type { Basis, Unit } from "./format";
@@ -95,7 +95,7 @@ export default function App() {
   });
 
   const exportJson = () => {
-    const blob = new Blob([JSON.stringify({ app: "panda-finance", version: 2, form }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ app: "panda-finance", version: 3, form }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "panda-finance-settings.json";
@@ -110,10 +110,14 @@ export default function App() {
         const raw = data.form as Record<string, unknown>;
         if (!raw || typeof raw.ageNow !== "string" || !Array.isArray(raw.expenses)) throw new Error("bad");
         // Phase 5：先跑舊檔轉換（socialEnabled 等），再只保留目前 FormState 的欄位
+        // Phase 6：舊檔（version 2 或沒有 lifeGoals）→ lifeGoals 維持預設 []；逐筆檢查，格式不對的略過
         const migrated = migrateLegacyForm(raw);
-        setForm(pickKnownFields(migrated, defaultForm() as unknown as Record<string, unknown>) as unknown as FormState);
+        const picked = pickKnownFields(migrated, defaultForm() as unknown as Record<string, unknown>) as unknown as FormState;
+        const sanitized = sanitizeLifeGoals(picked.lifeGoals);
+        picked.lifeGoals = sanitized.goals as FormState["lifeGoals"];
+        setForm(picked);
         setExampleActive(false);
-        setImportMsg("");
+        setImportMsg(sanitized.skipped > 0 ? `有 ${sanitized.skipped} 筆大目標格式不正確，已略過` : "");
       } catch {
         setImportMsg("設定檔格式不正確，無法匯入，原來的數字沒有被改動。");
       }
@@ -121,8 +125,9 @@ export default function App() {
   };
 
   const downloadCsv = (c: Computed) => {
-    const head = "年齡,年收入(元，今日幣值),年支出(元，今日幣值),年儲蓄(元，今日幣值),投資收益(元，今日幣值),年底資產(元，今日幣值)\n";
-    const lines = c.res.rows.map((r) => [r.age, Math.round(r.income), Math.round(r.expense), Math.round(r.flow), Math.round(r.gain), Math.round(r.assets)].join(","));
+    const hasGoals = (c.inp.lifeGoals?.length ?? 0) > 0;
+    const head = "年齡,年收入(元，今日幣值),年支出(元，今日幣值),年儲蓄(元，今日幣值),投資收益(元，今日幣值),年底資產(元，今日幣值)" + (hasGoals ? ",大目標一次支出(元，今日幣值),貸款還款(元/年，今日幣值)" : "") + "\n";
+    const lines = c.res.rows.map((r) => [r.age, Math.round(r.income), Math.round(r.expense), Math.round(r.flow), Math.round(r.gain), Math.round(r.assets), ...(hasGoals ? [Math.round(r.goalLump), Math.round(r.goalPay)] : [])].join(","));
     const blob = new Blob(["\uFEFF" + head + lines.join("\n")], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
