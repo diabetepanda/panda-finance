@@ -1,6 +1,7 @@
 // core/validate.ts｜輸入驗證（規格第 7 節）純函式。
 
 import { type SimInput } from "./simulate";
+import { validateLifeGoals } from "./lifeGoals";
 
 export interface ValidationResult {
   valid: boolean;
@@ -50,7 +51,14 @@ export function validateInput(inp: SimInput): ValidationResult {
     assumpErrors.push("假設參數請輸入數字。");
   } else {
     if (1 + inp.inflation / 100 <= 0) assumpErrors.push("通膨率使換算無法進行（需大於 −100%），請調整。");
-    if (inp.retPre > 30 || inp.retPre < -10) warnings.push(`投資年化報酬率 ${inp.retPre}%：這個數值極端，請確認。`);
+    // Phase 6 人生大目標：錯誤擋下並顯示於步驟 ②，提示（貸款超過壽命）列入 warnings
+  if (inp.lifeGoals && inp.lifeGoals.length > 0) {
+    const gv = validateLifeGoals(inp.lifeGoals, inp.ageNow, inp.ageLife);
+    incomeErrors.push(...gv.errors);
+    warnings.push(...gv.warnings);
+  }
+
+  if (inp.retPre > 30 || inp.retPre < -10) warnings.push(`投資年化報酬率 ${inp.retPre}%：這個數值極端，請確認。`);
     if (inp.retPost > 30 || inp.retPost < -10) warnings.push(`退休後年化報酬率 ${inp.retPost}%：這個數值極端，請確認。`);
     if (inp.inflation < -2 || inp.inflation > 15) warnings.push(`通膨率 ${inp.inflation}%：這個數值極端，請確認。`);
   }

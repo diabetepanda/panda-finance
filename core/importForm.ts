@@ -41,3 +41,36 @@ export function migrateLegacyForm(raw: Record<string, unknown>): Record<string, 
   }
   return out;
 }
+
+/**
+ * 人生大目標匯入檢查（Phase 6 第八節第 3 點）：逐筆檢查表單列的必要欄位，
+ * 缺少或格式不對的整筆略過並計數，其他設定照常匯入。
+ * 列的欄位型別：字串欄位接受字串或數字（匯出檔是字串，容忍手寫檔的數字）。
+ */
+export interface LifeGoalRowLike {
+  name: string; type: string; purchaseAge: string; price: string;
+  downMode: string; downValue: string; extraCosts: string;
+  loanRatePct: string; loanYears: string;
+}
+
+const GOAL_STR_FIELDS = ["name", "purchaseAge", "price", "downValue", "extraCosts", "loanRatePct", "loanYears"] as const;
+
+export function sanitizeLifeGoals(raw: unknown): { goals: LifeGoalRowLike[]; skipped: number } {
+  if (!Array.isArray(raw)) return { goals: [], skipped: 0 };
+  const goals: LifeGoalRowLike[] = [];
+  let skipped = 0;
+  for (const item of raw) {
+    if (item === null || typeof item !== "object") { skipped++; continue; }
+    const r = item as Record<string, unknown>;
+    const okStr = GOAL_STR_FIELDS.every((k) => typeof r[k] === "string" || typeof r[k] === "number");
+    const okType = r.type === "house" || r.type === "car" || r.type === "other";
+    const okMode = r.downMode === "amount" || r.downMode === "pct";
+    if (!okStr || !okType || !okMode) { skipped++; continue; }
+    goals.push({
+      name: String(r.name), type: String(r.type), purchaseAge: String(r.purchaseAge),
+      price: String(r.price), downMode: String(r.downMode), downValue: String(r.downValue),
+      extraCosts: String(r.extraCosts), loanRatePct: String(r.loanRatePct), loanYears: String(r.loanYears),
+    });
+  }
+  return { goals, skipped };
+}

@@ -5,6 +5,7 @@
 // 功能 (a) 的反推以此試算「每月多存 X 元」，預設 0 時結果與原版完全一致。
 
 import { realRate } from "./rates";
+import { goalFlowAt, type LifeGoal } from "./lifeGoals";
 import { pvAnnuity } from "./annuity";
 import type { CategoryId } from "../config/categories";
 import {
@@ -48,6 +49,8 @@ export interface SimInput {
   // contribution：工作期每年投入改走遞增路徑（今日幣值 12A×(1+g)^(t−1)，g 為調高幅度的實質率），
   // 取代「收入 − 支出」；extraMonthlySaving 照舊加上。
   contribution?: { monthlyStart: number; stepPct: number } | null;
+  // Phase 6 人生大目標：null/未提供/空陣列 = 沒有大目標，行為與先前完全相同。
+  lifeGoals?: LifeGoal[] | null;
   // cashYearsAtStart：工作期前 N 年用定存報酬率（名目 %），之後才用 retPre。
   cashYearsAtStart?: { years: number; cashRetPct: number } | null;
 }
@@ -64,6 +67,8 @@ export interface SimRow {
   li: number; // 勞保年金收入（實質，元/年；Phase 3）
   lp: number; // 勞退月領收入（實質，元/年；Phase 3）
   gap: number; // 年支出缺口（退休期；工作期為 0）
+  goalLump: number; // 人生大目標一次性支出（實質，元/年；Phase 6）
+  goalPay: number; // 人生大目標貸款還款（實質，元/年；Phase 6）
 }
 
 export interface SimResult {
@@ -103,7 +108,9 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
   const rho = realRate(inp.retPost / 100, inf);
   const g = realRate(inp.salaryGrowth / 100, inf);
   const workYears = R - A, retYears = L - R;
-  const rows: SimRow[] = [{ t: 0, age: A, phase: "now", income: 0, expense: 0, flow: 0, gain: 0, assets: inp.initAssets, li: 0, lp: 0, gap: 0 }];
+  const rows: SimRow[] = [{ t: 0, age: A, phase: "now", income: 0, expense: 0, flow: 0, gain: 0, assets: inp.initAssets, li: 0, lp: 0, gap: 0, goalLump: 0, goalPay: 0 }];
+  const goals = inp.lifeGoals ?? null;
+  const hasGoals = goals !== null && goals.length > 0;
   let assets = inp.initAssets;
   let workGap = 0, workGapNom = 0, lifetimeReal = 0, lifetimeNom = 0;
 
@@ -132,14 +139,15 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
     const rateT = inp.cashYearsAtStart != null && t <= inp.cashYearsAtStart.years
       ? realRate(inp.cashYearsAtStart.cashRetPct / 100, inf)
       : r;
-    const raw = assets * (1 + rateT) + saving;
+    const gf = hasGoals ? goalFlowAt(goals, A, t, inp.inflation) : { lump: 0, pay: 0 };
+    const raw = assets * (1 + rateT) + saving - gf.lump - gf.pay;
     let endA = raw;
     if (raw < 0) {
       workGap += -raw;
       workGapNom += -raw * Math.pow(1 + inf, t);
       endA = 0; // 資產下限 0，不讓負資產繼續計息（第 3.4 節）
     }
-    rows.push({ t, age: A + t, phase: "work", income, expense, flow: saving, gain: endA - assets - saving, assets: endA, li: 0, lp: 0, gap: 0 });
+    rows.push({ t, age: A + t, phase: "work", income, expense, flow: saving, gain: endA - assets - saving + gf.lump + gf.pay, assets: endA, li: 0, lp: 0, gap: 0, goalLump: gf.lump, goalPay: gf.pay });
     lifetimeReal += income;
     lifetimeNom += income * Math.pow(1 + inf, t);
     assets = endA;
@@ -194,15 +202,27 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
     // 支出缺口 = max(0, 退休支出 − 勞保 − 勞退月領 − 其他收入)；超額不回投（第 6.4、3.5 節）
     return { expense: exp, shortfall: Math.max(0, exp - income), li, lp, income };
   };
-  const shortfall = retireYear(1).shortfall; // Phase 1 固定缺口；拆分時為退休第一年缺口
+  // 有大目標時，退休期缺口再加上當年貸款還款（Phase 6 第三節第 6 點）：
+  // 缺口 = max(0, 退休支出 + 貸款還款 − 勞保 − 勞退月領 − 其他收入)
+  const retireYearWithGoals = (k: number) => {
+    const base = retireYear(k);
+    if (!hasGoals) return { ...base, goalLump: 0, goalPay: 0 };
+    const gf = goalFlowAt(goals, A, workYears + k, inp.inflation);
+    return {
+      ...base,
+      shortfall: Math.max(0, base.expense + gf.pay - base.income),
+      goalLump: gf.lump, goalPay: gf.pay,
+    };
+  };
+  const shortfall = retireYearWithGoals(1).shortfall; // Phase 1 固定缺口；拆分時為退休第一年缺口
   let uncovered = 0, uncoveredNom = 0, exhaustAge: number | null = null;
 
   for (let k = 1; k <= retYears; k++) {
     const t2 = workYears + k, age = R + k;
-    const { expense: retExpK, shortfall: shortfallK, li: liK, lp: lpK, income: incK } = retireYear(k);
+    const { expense: retExpK, shortfall: shortfallK, li: liK, lp: lpK, income: incK, goalLump: lumpK, goalPay: payK } = retireYearWithGoals(k);
     // 一次領空窗期結束：到達請領年齡那一年，帳戶（含空窗期累積）併入資產
     if (social && social.laborPension.mode === "lump" && age === lpStartAge && lpStartAge > R) assets += lpLumpAtClaim;
-    const raw2 = assets * (1 + rho) - shortfallK;
+    const raw2 = assets * (1 + rho) - shortfallK - lumpK;
     let endB = raw2;
     if (raw2 < -eps) {
       uncovered += -raw2;
@@ -210,19 +230,21 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
       if (exhaustAge === null) exhaustAge = age;
       endB = 0;
     }
-    rows.push({ t: t2, age, phase: "retire", income: incK, expense: retExpK, flow: -shortfallK, gain: endB - assets + shortfallK, assets: endB, li: liK, lp: lpK, gap: shortfallK });
+    rows.push({ t: t2, age, phase: "retire", income: incK, expense: retExpK, flow: -shortfallK, gain: endB - assets + shortfallK + lumpK, assets: endB, li: liK, lp: lpK, gap: shortfallK, goalLump: lumpK, goalPay: payK });
     assets = endB;
   }
 
   // 退休所需資金（第 3.6 節）：缺口固定用年金現值公式；缺口逐年不同時逐年折現加總
   let required: number;
   if (retYears <= 0) required = 0;
-  else if (!varying) required = shortfall <= 0 ? 0 : pvAnnuity(shortfall, rho, retYears);
+  else if (!varying && !hasGoals) required = shortfall <= 0 ? 0 : pvAnnuity(shortfall, rho, retYears);
   else {
+    // 有大目標時一律逐年折現：每年的（缺口 + 當年一次性支出）一起折現（Phase 6 第三節第 6 點）
     required = 0;
     for (let k = 1; k <= retYears; k++) {
-      const { shortfall: sk } = retireYear(k);
-      required += 1 + rho <= 0 ? sk : sk * Math.pow(1 + rho, -k);
+      const { shortfall: sk, goalLump: lk } = retireYearWithGoals(k);
+      const amt = sk + lk;
+      required += 1 + rho <= 0 ? amt : amt * Math.pow(1 + rho, -k);
     }
   }
 
