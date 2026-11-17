@@ -251,6 +251,7 @@
         .etf-table thead th{ font-size:7.5pt; }
         .etf-table tbody th{ font-weight:700; }
         .print-br{ display:inline; }
+        .etf-table .ph{ white-space:nowrap; }
         .chart-block{ break-inside:avoid; page-break-inside:avoid; }
         .chart-block h3{ break-after:avoid; }
         .chart-wrap{ break-inside:avoid; page-break-inside:avoid; }
