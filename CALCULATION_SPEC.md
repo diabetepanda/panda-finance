@@ -1,4 +1,4 @@
-# CALCULATION_SPEC.md｜計算規範對照（Phase 3 最終版）
+# CALCULATION_SPEC.md｜計算規範對照（Phase 4 最終版）
 
 把規格第 3 節（與第 5、6 節的公式）與實際程式逐條對照。每個核心函式列出：檔案、輸入、輸出、公式、範例數字（皆為測試實際驗證值）。所有計算在 core/，純函式。
 
@@ -27,8 +27,8 @@
 ## 主模擬（core/simulate.ts）
 
 ### simulate(inp, retireAge, tolerance)
-- 輸入：SimInput（年齡、資產、收支、假設、可選分類通膨/退休拆分/勞保勞退）、退休年齡、耗盡容許誤差。輸出：SimResult（逐年 rows、退休資產、所需資金、達成率、耗盡年齡、各缺口、勞保勞退明細）。
-- 工作期（第 t 年）：收入 = 月收入 × 12 × (1 + g)^(t−1)，g = realRate(薪資成長, 通膨)；支出 = 各項目 × 12（分類通膨開啟時各項目再乘 (1 + 類別實質成長率)^(t−1)，類別實質成長率 = (1 + 類別通膨)/(1 + 總通膨) − 1）；年底資產 = 去年資產 × (1 + r) + (收入 − 支出 + 額外儲蓄 × 12)，r = realRate(退休前報酬, 通膨)；資產負數下限 0，差額累計 workGap。
+- 輸入：SimInput（年齡、資產、收支、假設、可選類別通膨/退休拆分/勞保勞退）、退休年齡、耗盡容許誤差。輸出：SimResult（逐年 rows、退休資產、所需資金、達成率、耗盡年齡、各缺口、勞保勞退明細）。
+- 工作期（第 t 年）：收入 = 月收入 × 12 × (1 + g)^(t−1)，g = realRate(薪資成長, 通膨)；支出 = 各項目 × 12（類別通膨開啟時各項目再乘 (1 + 類別實質成長率)^(t−1)，類別實質成長率 = (1 + 類別通膨)/(1 + 總通膨) − 1）；年底資產 = 去年資產 × (1 + r) + (收入 − 支出 + 額外儲蓄 × 12)，r = realRate(退休前報酬, 通膨)；資產負數下限 0，差額累計 workGap。
 - 退休期（第 k 年，總經過年數 t2 = 工作年數 + k）：支出缺口 = max(0, 退休支出 − 勞保年金 − 勞退月領 − 其他退休收入)，超額不回投；年底資產 = 去年資產 × (1 + rho) − 缺口，rho = realRate(退休後報酬, 通膨)；跌破 −tolerance 記耗盡年齡、資產歸 0、差額累計 uncovered。
 - 退休所需資金：缺口固定時 pvAnnuity(缺口, rho, 退休年數)；缺口逐年不同（分類拆分或勞保勞退）時逐年折現加總 Σ 缺口_k / (1 + rho)^k。
 - 範例（範例資料）：退休資產 20,351,xxx（2,035.1 萬）、所需資金 4,432,xxx（443.2 萬）、達成率 459.2%、耗盡年齡 null（撐到 85 歲）。
@@ -84,7 +84,7 @@
 
 ### computeScenarios(baseInp, settings)
 - 配置總和 ≠ 100% → paused（不計算）。每情境以自己的通膨與組合報酬跑 simulate + earliestRetirement；名目換算一律用該情境通膨。
-- resolveScenarioInflation：中性通膨未手動修改時 = 主畫面通膨（Phase 3 連動修正）。
+- resolveScenarioInflation：中性通膨未手動修改時 = 主畫面通膨（Phase 3 連動修正）。Phase 4 起 UI 不使用、情境通膨改讀設定檔固定值（2.5／2／1.5），函式保留供日後擴充。
 
 ## 目標反推（core/goals.ts）
 
@@ -113,3 +113,37 @@
 - 標的未啟用：rows = [{ key: "single", inp: 主畫面 inp }]，反推與主畫面同一組假設。
 - 標的啟用：rows = 三情境各自的 inp。
 - 範例：未啟用、Z = 目前結餘 → 模式三答案 = 主畫面最早退休年齡 49 歲（測試驗證）。
+
+## 定期定額遞增年金（core/dca.ts，Phase 4 第五節）
+
+### dca({ monthlyStart A, stepPct, nominalReturnPct, inflationPct, years n })
+- 實質率：r = realRate(名目報酬, 通膨)，g = realRate(調高幅度, 通膨)。
+- 每年年底投入：第 t 年投入（今日幣值）= 12A × (1+g)^(t−1)。
+- 終值（今日幣值）：FV = 12A × [(1+r)^n − (1+g)^n] ÷ (r − g)；|r − g| < 1e-12 時 FV = 12A × n × (1+r)^(n−1)。
+- 名目換算：本模組把第 1 年當成今天的價格，第 t 年名目金額 = 今日幣值 × (1+通膨)^(t−1)；終值名目 = FV × (1+通膨)^(n−1)；第 t 年名目每月投入 = A × (1+調高幅度)^(t−1)。
+- 輸出：逐年曲線（今日幣值與名目）、FV、累積投入本金（今日幣值與名目）、第 1 年每月 A、最後一年每月（今日幣值 A×(1+g)^(n−1)、名目 A×(1+調高幅度)^(n−1)）。
+- 範例（A=20,000、調高 2.5%、通膨 2%、30 年）：最後一年每月名目 40,928 元、今日幣值 23,047 元；中性 7% 時 FV（今日幣值）1,656.2 萬、固定金額版 1,276.6 萬；累積本金加碼版名目 1,053.7 萬、今日幣值 773.6 萬（Phase 4 測試驗證）。
+
+### dcaPair(inp)
+- 同時回傳「每年加碼」（stepPct 原值）與「固定金額」（stepPct = 0）兩組 dca 結果。
+
+## 其他退休收入小幫手（core/otherIncome.ts，Phase 4 第一節）
+
+### sumOtherRetireIncome({ rentNet, annuity, partTime })
+- 三項（元/月，今日幣值）加總；負數或非有限值（NaN）當 0。
+
+## 主模擬擴充欄位（core/simulate.ts，Phase 4 第六節）
+
+### contribution?: { monthlyStart, stepPct } | null
+- 提供時，工作期第 t 年投入 = 12 × monthlyStart × (1+gC)^(t−1)（gC = realRate(stepPct, 通膨)），取代「收入 − 支出」；extraMonthlySaving 照舊加上。未提供時行為完全不變。
+
+### cashYearsAtStart?: { years, cashRetPct } | null
+- 提供時，工作期前 years 年的資產成長率改用 realRate(cashRetPct, 通膨)，之後恢復 retPre。未提供時行為完全不變。
+
+## 投資對照卡（core/investCompare.ts，Phase 4 第六節）
+
+### investCompare({ base, monthlyStart, stepPct, cashRetPct })
+- 四組試算（base 與主畫面相同，含勞保勞退）：定存（retPre = retPost = 定存中性 1.7%）×（加碼／固定）、大盤型 ETF 組合（第 3 區 retPre／retPost）×（加碼／固定），皆以 contribution 投入。每組回傳退休時資產與最早可退休年齡（同主引擎）。
+- 晚開始對照：delayYears = 工作年數 ≥ 10 時 10 年，否則一半（無條件捨去、至少 1 年並註明）；以 cashYearsAtStart 讓前 delayYears 年放定存。
+- 動態說明數字：以 dca（年限 = 工作年數、報酬 = base.retPre）算 A、B（名目）、B′（今日幣值）；C = 大盤固定金額組的退休時資產（今日幣值與名目，名目以 (1+通膨)^工作年數 換算）。
+- 口徑差異：主畫面用「收入 − 支出」實際結餘，本模組用設定的定期定額金額，數字不會與主畫面摘要完全相同（網頁已以一般文字說明）。
