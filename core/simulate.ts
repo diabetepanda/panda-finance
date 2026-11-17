@@ -34,7 +34,8 @@ export interface SimInput {
   retPre: number; // 名目 %
   retPost: number; // 名目 %
   extraMonthlySaving: number; // 額外每月儲蓄（反推用，預設 0）
-  // Phase 2 分類通膨（第 5.6 節）：類別通膨率（%）；null/未提供 = 單一通膨，
+  // Phase 2 分類通膨（第 5.6 節）：類別通膨率（%）；null/未提供 = 單一通膨。
+  // Phase 4 起 UI 不使用（UI 一律傳 null），保留供日後擴充。
   // 結果與 Phase 1 完全一致。某類別為 null = 採用總通膨率。
   categoryInflation?: Partial<Record<CategoryId, number | null>> | null;
   // Phase 2 退休支出依類別拆分：提供時退休支出逐年依類別實質成長率變動，
@@ -43,6 +44,12 @@ export interface SimInput {
   // Phase 3 勞保勞退（第 6 節）：null/未提供 = 不納入，結果與 Phase 1/2 一致。
   // 年資、減給、勞退累積都在 simulate 內依候選退休年齡 R 重算（第 3.7 節要求）。
   social?: SocialInput | null;
+  // Phase 4 投資對照（第六節）：未提供時行為完全不變。
+  // contribution：工作期每年投入改走遞增路徑（今日幣值 12A×(1+g)^(t−1)，g 為調高幅度的實質率），
+  // 取代「收入 − 支出」；extraMonthlySaving 照舊加上。
+  contribution?: { monthlyStart: number; stepPct: number } | null;
+  // cashYearsAtStart：工作期前 N 年用定存報酬率（名目 %），之後才用 retPre。
+  cashYearsAtStart?: { years: number; cashRetPct: number } | null;
 }
 
 export interface SimRow {
@@ -115,8 +122,17 @@ export function simulate(inp: SimInput, retireAge: number, eps: number): SimResu
         }
       }
     }
-    const saving = income - expense + inp.extraMonthlySaving * 12;
-    const raw = assets * (1 + r) + saving;
+    let saving: number;
+    if (inp.contribution != null) {
+      const gC = realRate(inp.contribution.stepPct / 100, inf);
+      saving = 12 * inp.contribution.monthlyStart * Math.pow(1 + gC, t - 1) + inp.extraMonthlySaving * 12;
+    } else {
+      saving = income - expense + inp.extraMonthlySaving * 12;
+    }
+    const rateT = inp.cashYearsAtStart != null && t <= inp.cashYearsAtStart.years
+      ? realRate(inp.cashYearsAtStart.cashRetPct / 100, inf)
+      : r;
+    const raw = assets * (1 + rateT) + saving;
     let endA = raw;
     if (raw < 0) {
       workGap += -raw;

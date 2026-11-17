@@ -123,6 +123,7 @@ export function computeScenarios(baseInp: SimInput, s: ScenarioSettings): Scenar
  * 中性情境通膨連動（Phase 3 修正）：未被手動修改時，中性情境通膨
  * 跟著主畫面通膨率；手動改過才脫鉤。保守/樂觀維持獨立。
  */
+/** Phase 4 起 UI 不使用，保留供日後擴充（情境通膨改讀設定檔固定值） */
 export function resolveScenarioInflation(
   raw: Record<ScenarioId, number>, neutralLinked: boolean, mainInflationPct: number
 ): Record<ScenarioId, number> {
