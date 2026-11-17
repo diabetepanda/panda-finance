@@ -20,7 +20,7 @@ npm run preview # 預覽建置結果
 ## 如何執行測試
 
 ```bash
-npm test        # Vitest，涵蓋規格案例 1–17、Phase 3.2 與 Phase 4 測試
+npm test        # Vitest，涵蓋規格案例 1–17、Phase 3.2、Phase 4 與 Phase 5／5.1／5.2 測試（共 91 項）
 ```
 
 ## 專案架構
@@ -37,7 +37,7 @@ npm test        # Vitest，涵蓋規格案例 1–17、Phase 3.2 與 Phase 4 測
 
 - [PARAMETERS.md](PARAMETERS.md)：所有參數清單（含 Phase 4 報酬率推算邏輯與 ETF 挑選依據）
 - [CALCULATION_SPEC.md](CALCULATION_SPEC.md)：計算規範與程式公式逐條對照（函式輸入/輸出/公式/範例數字）
-- [TEST_REPORT.md](TEST_REPORT.md)：測試報告（88 項全過）
+- [TEST_REPORT.md](TEST_REPORT.md)：測試報告（91 項全過）
 - [RISKS.md](RISKS.md)：已知風險與未做項目
 - [ASSUMPTIONS.md](ASSUMPTIONS.md)：簡化假設與已知限制
 - 計算規範與公式：見網站內「計算說明」區塊
